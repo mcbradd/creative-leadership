@@ -35,3 +35,18 @@ test("keeps the live artifact responsive and motion-aware", async () => {
   assert.match(css, /font-kerning: normal/);
   assert.doesNotMatch(css, /Arial Narrow|Aptos Narrow/);
 });
+
+test("makes every visual affordance actionable and uses upgraded proof imagery", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("src/App.tsx", root), "utf8"),
+    readFile(new URL("src/styles.css", root), "utf8"),
+  ]);
+
+  assert.match(app, /href="#team"/);
+  assert.match(app, /onClick=\{\(\) => openInsight\(insight\)\}/);
+  assert.match(app, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(app, /tetris-beat-cover\.webp/);
+  assert.match(app, /crayola-funny-faces-front\.webp/);
+  assert.match(css, /\.hero-orbit \{[^}]*pointer-events: none/s);
+  assert.match(css, /\.social-button \{/);
+});

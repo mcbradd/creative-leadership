@@ -17,13 +17,102 @@ type CaseStudy = {
   proof: string[];
 };
 
+type Insight = {
+  id: string;
+  title: string;
+  kicker: string;
+  statement: string;
+  brief: string;
+  moves: string[];
+  proof: string[];
+};
+
+const capabilityInsights: Insight[] = [
+  {
+    id: "ip-stewardship",
+    title: "IP Stewardship",
+    kicker: "Protect the center. Expand the edges.",
+    statement: "We identify what audiences cannot afford to lose—then create room for everything the property can become.",
+    brief: "Strong stewardship is not preservation by inertia. It is a clear set of creative rules that lets teams move faster while keeping character, tone, canon, and audience trust intact.",
+    moves: ["Define the non-negotiable emotional promise", "Translate canon into practical creative guardrails", "Align licensors, makers, and commercial stakeholders"],
+    proof: ["Tetris", "Disney", "Warner Bros. / DC", "Nickelodeon"],
+  },
+  {
+    id: "game-design",
+    title: "Game Design",
+    kicker: "Make the promise playable.",
+    statement: "The interaction should express the world—not merely sit inside it.",
+    brief: "We move from audience fantasy to core loop, game feel, progression, and prototype. The goal is a product people understand with their hands before anyone has to explain it.",
+    moves: ["Prototype the defining player fantasy", "Tune feedback, rhythm, onboarding, and accessibility", "Connect systems to retention without weakening the premise"],
+    proof: ["Ultimate Rivals", "Tetris Beat", "Roblox", "Tabletop systems"],
+  },
+  {
+    id: "visual-systems",
+    title: "Visual Systems",
+    kicker: "Give the world a grammar.",
+    statement: "A great visual language remains recognizable across artists, formats, and years.",
+    brief: "We build systems—not isolated key art—so every UI state, card, collectible, environment, and marketing surface feels like it belongs to the same world.",
+    moves: ["Establish shape, color, material, and motion logic", "Build modular templates for many contributors", "Create review standards that protect quality at scale"],
+    proof: ["Chaotic", "Batman: The Animated Series", "Court of the Dead", "Tetris Beat"],
+  },
+  {
+    id: "product-strategy",
+    title: "Product Strategy",
+    kicker: "Connect creative ambition to durable value.",
+    statement: "We help the strongest idea survive contact with schedule, platform, licensing, and market reality.",
+    brief: "That means shaping the pitch, sequencing the product, defining the content architecture, and choosing where to invest so a launch can become an expandable business.",
+    moves: ["Clarify the audience and commercial thesis", "Map one IP across physical and digital surfaces", "Build credible production and investment narratives"],
+    proof: ["Two funding rounds", "$40M+ investment narrative", "Multi-league licensing", "Live-ops planning"],
+  },
+  {
+    id: "team-building",
+    title: "Team Building",
+    kicker: "Build the team around the problem.",
+    statement: "Creative leadership becomes real in the decisions a team can make without waiting for permission.",
+    brief: "We create shared language, useful constraints, healthy critique, and production clarity across art, design, engineering, brand, and external partners.",
+    moves: ["Align disciplines around one visible quality target", "Mentor leads and remove structural friction", "Scale culture and process with the work"],
+    proof: ["Teams from 5 to 80", "Global art teams of 40–200+", "Teaching + mentorship", "At-risk production recovery"],
+  },
+];
+
+const rangeInsights: Insight[] = [
+  {
+    id: "play",
+    title: "Play",
+    kicker: "Story becomes agency.",
+    statement: "We turn the premise of an IP into decisions, feedback, rhythm, and mastery.",
+    brief: "From controller prototypes to tabletop loops, the work begins with the feeling the audience came to inhabit—and the repeatable interaction that can deliver it.",
+    moves: ["Core loops and rapid prototypes", "Game feel, feedback, and technical direction", "Progression, live content, and player clarity"],
+    proof: ["Ultimate Rivals", "Tetris Beat", "Roblox", "Mourners Call"],
+  },
+  {
+    id: "collect",
+    title: "Collect",
+    kicker: "Desire becomes an object.",
+    statement: "A collectible is a concentrated piece of worldbuilding—identity, story, scarcity, and craft in one surface.",
+    brief: "We understand the system behind the object: visual hierarchy, variant logic, packaging, material cues, character appeal, and the ritual of discovery.",
+    moves: ["Trading-card and variant systems", "Premium collectibles and packaging", "Physical-to-digital product expression"],
+    proof: ["Chaotic TCG", "RAID", "WB / DC", "Court of the Dead"],
+  },
+  {
+    id: "grow",
+    title: "Grow",
+    kicker: "One launch becomes a world.",
+    statement: "We design the creative operating system that lets an IP expand without becoming generic.",
+    brief: "Franchise logic, pipelines, design bibles, content architecture, and team development create the conditions for growth across products and generations.",
+    moves: ["Franchise and style-guide systems", "Scalable art and production pipelines", "Talent development and partner alignment"],
+    proof: ["Disney pipeline +60%", "Chaotic transmedia system", "Tetris Beat live levels", "Global production teams"],
+  },
+];
+
 const caseStudies: CaseStudy[] = [
   {
     id: "ultimate-rivals",
     title: "Ultimate Rivals",
     owner: "Bradd · Creative + Game Direction",
     eyebrow: "League-spanning play",
-    image: "bradd-rink.jpg",
+    image: "ultimate-rivals-hires.jpg",
+    imagePosition: "33% center",
     alt: "Ultimate Rivals ice rink game artwork",
     statement: "One sports universe. Every league in play.",
     brief:
@@ -36,45 +125,11 @@ const caseStudies: CaseStudy[] = [
     proof: ["Multi-league IP system", "$40M+ studio investment narrative", "Team scaled from 4 to 55+"],
   },
   {
-    id: "disney",
-    title: "Disney Enchanted Tales",
-    owner: "Bradd · Pipeline + Creative Leadership",
-    eyebrow: "Story at production scale",
-    image: "bradd-disney.jpg",
-    alt: "Disney Enchanted Tales character animation production image",
-    statement: "A beloved world needs a production system worthy of it.",
-    brief:
-      "Increase the velocity and consistency of a character-heavy Disney experience without flattening the personality that makes the IP matter.",
-    moves: [
-      "Redesigned the art and animation pipeline around clearer handoffs and reusable systems.",
-      "Connected creative standards directly to technical constraints and team practice.",
-      "Built a structure that let artists spend more time on performance and less on repetition.",
-    ],
-    proof: ["60% pipeline acceleration", "200+ minutes of animation", "60+ character rigs"],
-  },
-  {
-    id: "emerging",
-    title: "Emerging Production",
-    owner: "Bradd · Technical + Creative Direction",
-    eyebrow: "New tools, responsible leverage",
-    image: "bradd-neighbor.jpg",
-    alt: "Stylized game character artwork from Secret Neighbor",
-    statement: "Use new technology to expand taste—not replace it.",
-    brief:
-      "Build practical, rights-cleared production approaches for Roblox-scale content and other fast-moving formats while protecting the human judgment at the center of the work.",
-    moves: [
-      "Designed production systems that connect creative intent, tool choice, and legal clarity.",
-      "Mentored cross-disciplinary teams through unfamiliar technical and aesthetic territory.",
-      "Turned experiments into repeatable workflows instead of isolated demos.",
-    ],
-    proof: ["2×+ output in tested workflows", "Rights-cleared approach", "Global team enablement"],
-  },
-  {
     id: "chaotic",
     title: "Chaotic",
     owner: "Stone · Franchise Art Direction",
     eyebrow: "A world built to travel",
-    image: "stone-chaotic.jpg",
+    image: "stone-chaotic-hires.jpg",
     alt: "Chaotic fantasy trading card artwork",
     statement: "A franchise language players can watch, play, and collect.",
     brief:
@@ -87,11 +142,29 @@ const caseStudies: CaseStudy[] = [
     proof: ["TCG + animation + games", "40–200+ global contributors", "Franchise-wide visual system"],
   },
   {
+    id: "disney",
+    title: "Disney Enchanted Tales",
+    owner: "Bradd · Pipeline + Creative Leadership",
+    eyebrow: "Story at production scale",
+    image: "disney-hires.jpg",
+    alt: "Disney Enchanted Tales character artwork",
+    statement: "A beloved world needs a production system worthy of it.",
+    brief:
+      "Increase the velocity and consistency of a character-heavy Disney experience without flattening the personality that makes the IP matter.",
+    moves: [
+      "Redesigned the art and animation pipeline around clearer handoffs and reusable systems.",
+      "Connected creative standards directly to technical constraints and team practice.",
+      "Built a structure that let artists spend more time on performance and less on repetition.",
+    ],
+    proof: ["60% pipeline acceleration", "200+ minutes of animation", "60+ character rigs"],
+  },
+  {
     id: "warner",
     title: "Warner Bros. + DC",
     owner: "Stone · Licensed-Product Art Direction",
     eyebrow: "Icons, many expressions",
-    image: "stone-wb-dc.webp",
+    image: "stone-wb-hires.webp",
+    imagePosition: "center 24%",
     alt: "DC Comics character style and product artwork",
     statement: "Make heritage IP feel current without losing its center.",
     brief:
@@ -104,11 +177,30 @@ const caseStudies: CaseStudy[] = [
     proof: ["Batman + Harley Quinn", "Looney Tunes + Scooby-Doo", "Cards + collectibles + cel art"],
   },
   {
+    id: "emerging",
+    title: "Emerging Production",
+    owner: "Bradd · Technical + Creative Direction",
+    eyebrow: "New tools, responsible leverage",
+    image: "neighbor-hires.jpg",
+    imagePosition: "center 38%",
+    alt: "Secret Neighbor Roblox Edition key artwork",
+    statement: "Use new technology to expand taste—not replace it.",
+    brief:
+      "Build practical, rights-cleared production approaches for Roblox-scale content and other fast-moving formats while protecting the human judgment at the center of the work.",
+    moves: [
+      "Designed production systems that connect creative intent, tool choice, and legal clarity.",
+      "Mentored cross-disciplinary teams through unfamiliar technical and aesthetic territory.",
+      "Turned experiments into repeatable workflows instead of isolated demos.",
+    ],
+    proof: ["2×+ output in tested workflows", "Rights-cleared approach", "Global team enablement"],
+  },
+  {
     id: "court",
     title: "Court of the Dead",
     owner: "Stone · Worldbuilding + Art Direction",
     eyebrow: "From mythology to play",
-    image: "stone-court.jpg",
+    image: "stone-court-hires.jpg",
+    imagePosition: "65% center",
     alt: "Court of the Dead fantasy character artwork",
     statement: "Build the rules of a world before multiplying its surfaces.",
     brief:
@@ -123,9 +215,14 @@ const caseStudies: CaseStudy[] = [
 ];
 
 const supportingProof = [
-  { label: "RAID", note: "Card game direction", image: "stone-raid.jpg" },
-  { label: "TOYOTA", note: "North American identity", image: "stone-toyota.jpg" },
-  { label: "SAW X", note: "Playable brand experience", image: "bradd-saw.jpg" },
+  { label: "RAID", note: "Card game direction", image: "stone-raid-hires.jpg", position: "center 52%" },
+  { label: "TOYOTA", note: "North American identity", image: "stone-toyota-hires.jpg", position: "center", fit: "contain" },
+  { label: "SAW X", note: "Playable brand experience", image: "saw-hires.jpg", position: "center" },
+];
+
+const industryPartners = [
+  "Apple", "Disney", "Warner Bros.", "DC", "PlayStation", "Xbox", "Roblox",
+  "EA", "Tetris", "Crayola", "Toyota", "Nickelodeon", "SpongeBob", "Niantic", "Sideshow",
 ];
 
 function FoilCard({ study, onOpen }: { study: CaseStudy; onOpen: () => void }) {
@@ -162,8 +259,10 @@ function FoilCard({ study, onOpen }: { study: CaseStudy; onOpen: () => void }) {
 
 export default function App() {
   const [activeStudy, setActiveStudy] = useState<CaseStudy | null>(null);
+  const [activeInsight, setActiveInsight] = useState<Insight | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const lastTrigger = useRef<HTMLElement | null>(null);
+  const savedScrollY = useRef(0);
   const closeButton = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -177,24 +276,55 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!activeStudy) return;
+    if (!activeStudy && !activeInsight) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActiveStudy(null);
+      if (event.key === "Escape") {
+        setActiveStudy(null);
+        setActiveInsight(null);
+      }
     };
     document.body.classList.add("modal-open");
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${savedScrollY.current}px`;
+    document.body.style.width = "100%";
     window.addEventListener("keydown", onKeyDown);
     closeButton.current?.focus();
     return () => {
       document.body.classList.remove("modal-open");
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
       window.removeEventListener("keydown", onKeyDown);
-      lastTrigger.current?.focus();
+      const previousScrollBehavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = "auto";
+      window.scrollTo(0, savedScrollY.current);
+      document.documentElement.style.scrollBehavior = previousScrollBehavior;
+      lastTrigger.current?.focus({ preventScroll: true });
     };
-  }, [activeStudy]);
+  }, [activeStudy, activeInsight]);
+
+  const prepareOverlay = () => {
+    lastTrigger.current = document.activeElement as HTMLElement;
+    savedScrollY.current = window.scrollY;
+  };
 
   const openStudy = (study: CaseStudy) => {
-    lastTrigger.current = document.activeElement as HTMLElement;
+    prepareOverlay();
     setActiveStudy(study);
   };
+
+  const openInsight = (insight: Insight) => {
+    prepareOverlay();
+    setActiveInsight(insight);
+  };
+
+  const closeOverlay = () => {
+    setActiveStudy(null);
+    setActiveInsight(null);
+  };
+
+  const activeDetail = activeStudy ?? activeInsight;
+  const isCaseStudy = Boolean(activeStudy);
 
   return (
     <>
@@ -230,8 +360,11 @@ export default function App() {
             </a>
           </div>
           <div className="signal-strip" aria-label="Selected capabilities">
-            <span>IP stewardship</span><span>Game design</span><span>Visual systems</span>
-            <span>Product strategy</span><span>Team building</span>
+            {capabilityInsights.map((insight) => (
+              <button key={insight.id} type="button" onClick={() => openInsight(insight)}>
+                {insight.title}<span aria-hidden="true">＋</span>
+              </button>
+            ))}
           </div>
         </section>
 
@@ -248,9 +381,11 @@ export default function App() {
           <div className="leader-grid">
             <article className="leader-card leader-bradd">
               <div className="portrait-wrap">
-                <img src={media("bradd.jpg")} alt="Bradd McBrearty" />
+                <img src={media("bradd-portrait.png")} alt="Bradd McBrearty" />
                 <div className="portrait-sheen" aria-hidden="true" />
               </div>
+              <div className="chase-meta"><span>2026 / CURRENT SEASON</span><b>CHASE 01</b></div>
+              <div className="foil-corners" aria-hidden="true" />
               <div className="leader-copy">
                 <p className="leader-role">Creative Director</p>
                 <h3>Bradd McBrearty</h3>
@@ -262,9 +397,11 @@ export default function App() {
 
             <article className="leader-card leader-stone">
               <div className="portrait-wrap">
-                <img src={media("stone.jpg")} alt="Stone Perales" />
+                <img src={media("stone-portrait.png")} alt="Stone Perales" />
                 <div className="portrait-sheen" aria-hidden="true" />
               </div>
+              <div className="chase-meta"><span>2026 / CURRENT SEASON</span><b>CHASE 02</b></div>
+              <div className="foil-corners" aria-hidden="true" />
               <div className="leader-copy">
                 <p className="leader-role">Art Director</p>
                 <h3>Stone Perales</h3>
@@ -281,8 +418,14 @@ export default function App() {
 
         <section className="proof-section" id="proof">
           <div className="proof-visual" aria-hidden="true">
-            <div className="proof-image proof-image-a"><img src={media("bradd-tetris.jpg")} alt="" /></div>
-            <div className="proof-image proof-image-b"><img src={media("stone-tetris.webp")} alt="" /></div>
+            <div className="proof-image proof-image-a">
+              <img src={media("tetris-beat-cover.webp")} alt="" />
+              <span>Official brand mark / Stone Perales</span>
+            </div>
+            <div className="proof-image proof-image-b">
+              <img src={media("tetris-beat-gameplay.jpg")} alt="" />
+              <span>Gameplay / shipped experience</span>
+            </div>
             <div className="foil-plane" />
             <span className="proof-stamp">SHIPPED<br />TOGETHER</span>
           </div>
@@ -313,17 +456,37 @@ export default function App() {
             <h2>One idea.<br /><em>Every surface.</em></h2>
           </div>
           <div className="range-grid">
-            <article><span>01</span><h3>Play</h3><p>Game loops, interaction, technical frameworks, and the systems that turn story into agency.</p></article>
-            <article><span>02</span><h3>Collect</h3><p>Cards, premium objects, characters, packaging, and visual languages people want to own.</p></article>
-            <article><span>03</span><h3>Grow</h3><p>Franchise logic, product strategy, pipelines, and teams built to carry an IP beyond one launch.</p></article>
+            {rangeInsights.map((insight, index) => (
+              <button className="range-card" type="button" key={insight.id} onClick={() => openInsight(insight)}>
+                <span>0{index + 1}</span><h3>{insight.title}</h3>
+                <p>{index === 0 ? "Game loops, interaction, technical frameworks, and the systems that turn story into agency." : index === 1 ? "Cards, premium objects, characters, packaging, and visual languages people want to own." : "Franchise logic, product strategy, pipelines, and teams built to carry an IP beyond one launch."}</p>
+                <b>Explore this lens <i aria-hidden="true">＋</i></b>
+              </button>
+            ))}
           </div>
           <p className="range-note">We connect the emotional promise of a world to the practical system that lets it expand.</p>
+        </section>
+
+        <section className="industry-section" id="industry-proof">
+          <div className="industry-head">
+            <p className="section-index">04 / Industry proof</p>
+            <h2>Trusted inside iconic worlds.</h2>
+            <p>Our range is not theoretical. We have earned trust across category-defining platforms, entertainment properties, consumer brands, and collectible ecosystems.</p>
+          </div>
+          <div className="partner-wall" aria-label="Selected industry partners and properties">
+            {industryPartners.map((partner, index) => <span key={partner} data-index={String(index + 1).padStart(2, "0")}>{partner}</span>)}
+          </div>
+          <div className="industry-argument">
+            <article><b>PLATFORM PROOF</b><p>Shipped and pitched inside Apple, PlayStation, Xbox, Roblox, and emerging interactive ecosystems.</p></article>
+            <article><b>FRANCHISE PROOF</b><p>Protected globally recognized character worlds while building new systems for play, collecting, and growth.</p></article>
+            <article><b>PRODUCT PROOF</b><p>Connected on-screen experience to cards, toys, premium collectibles, packaging, and physical-digital products.</p></article>
+          </div>
         </section>
 
         <section className="work-section" id="work">
           <div className="work-head">
             <div>
-              <p className="section-index">04 / Selected case files</p>
+              <p className="section-index">05 / Selected case files</p>
               <h2>Range is the proof.</h2>
             </div>
             <p>Six worlds. Six different constraints. One consistent instinct: find the defining idea, then build the system that protects it.</p>
@@ -336,12 +499,13 @@ export default function App() {
         </section>
 
         <section className="collab-section" id="collaboration">
-          <div className="collab-art" aria-hidden="true">
-            <span className="mask mask-a" /><span className="mask mask-b" />
-            <span className="mask mask-c" /><span className="color-field" />
+          <div className="collab-art">
+            <img className="crayola-main" src={media("crayola-funny-faces-front.webp")} alt="Crayola Funny Faces Crazy Costumes product showing a virtual mask in use" loading="lazy" />
+            <div className="crayola-inset"><img src={media("crayola-funny-faces-back.webp")} alt="Children mixing and wearing Crayola Color Alive virtual masks" loading="lazy" /></div>
+            <span className="mask-count">250+<small>VIRTUAL MASKS</small></span>
           </div>
           <div className="collab-copy">
-            <p className="section-index">05 / Physical becomes interactive</p>
+            <p className="section-index">06 / Physical becomes interactive</p>
             <p className="project-kicker">Crayola Color Alive · Funny Faces—Crazy Costumes</p>
             <h2>When the obvious route did not work, we made a new one.</h2>
             <p>
@@ -359,7 +523,7 @@ export default function App() {
 
         <section className="depth-section" id="depth">
           <div className="depth-head">
-            <p className="section-index">06 / Individual depth</p>
+            <p className="section-index">07 / Individual depth</p>
             <h2>Deep craft.<br />Executive altitude.</h2>
           </div>
 
@@ -387,8 +551,8 @@ export default function App() {
 
           <div className="supporting-grid" aria-label="Additional selected projects">
             {supportingProof.map((item) => (
-              <article key={item.label}>
-                <img src={media(item.image)} alt="" loading="lazy" />
+              <article key={item.label} className={item.fit === "contain" ? "supporting-contain" : undefined}>
+                <img src={media(item.image)} alt="" loading="lazy" style={{ objectPosition: item.position }} />
                 <div><strong>{item.label}</strong><span>{item.note}</span></div>
               </article>
             ))}
@@ -397,7 +561,7 @@ export default function App() {
 
         <section className="mentorship-section" id="mentorship">
           <div className="mentorship-kicker">
-            <p className="section-index">07 / The work after the work</p>
+            <p className="section-index">08 / The work after the work</p>
             <span aria-hidden="true">∞</span>
           </div>
           <div className="mentorship-copy">
@@ -421,36 +585,40 @@ export default function App() {
         </section>
 
         <section className="contact-section" id="contact">
-          <p className="section-index">08 / A new world starts with a conversation</p>
+          <p className="section-index">09 / A new world starts with a conversation</p>
           <h2>Let&apos;s build<br /><em>what&apos;s next.</em></h2>
           <p>Bring us the property, the possibility, or the production problem that deserves a stronger creative system.</p>
           <div className="contact-actions">
             <a className="primary-action" href="mailto:bradd.mcbrearty@gmail.com">Start a conversation <span>↗</span></a>
             <div className="social-actions">
-              <a href="https://www.linkedin.com/in/braddmcbrearty/" target="_blank" rel="noreferrer">Bradd on LinkedIn ↗</a>
-              <a href="https://www.linkedin.com/in/stone/" target="_blank" rel="noreferrer">Stone on LinkedIn ↗</a>
+              <a className="social-button" href="https://www.linkedin.com/in/braddmcbrearty/" target="_blank" rel="noopener noreferrer" aria-label="Open Bradd McBrearty on LinkedIn in a new tab"><span>Bradd on LinkedIn</span><b>↗</b></a>
+              <a className="social-button" href="https://www.linkedin.com/in/stone/" target="_blank" rel="noopener noreferrer" aria-label="Open Stone Perales on LinkedIn in a new tab"><span>Stone on LinkedIn</span><b>↗</b></a>
             </div>
           </div>
           <footer><span>BRADD + STONE</span><span>Creative leadership for games, brands &amp; entertainment</span><span>2026</span></footer>
         </section>
       </main>
 
-      {activeStudy && (
-        <div className="case-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveStudy(null); }}>
-          <article className="case-dialog" role="dialog" aria-modal="true" aria-labelledby="case-title">
-            <button ref={closeButton} className="dialog-close" type="button" onClick={() => setActiveStudy(null)} aria-label="Close case study">Close <span>×</span></button>
-            <div className="dialog-image">
-              <img src={media(activeStudy.image)} alt={activeStudy.alt} />
-              <span>{activeStudy.eyebrow}</span>
-            </div>
+      {activeDetail && (
+        <div className="case-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeOverlay(); }}>
+          <article className={`case-dialog ${isCaseStudy ? "" : "insight-dialog"}`} role="dialog" aria-modal="true" aria-labelledby="case-title">
+            <button ref={closeButton} className="dialog-close" type="button" onClick={closeOverlay} aria-label="Close detail panel">Close <span>×</span></button>
+            {activeStudy ? (
+              <div className="dialog-image">
+                <img src={media(activeStudy.image)} alt={activeStudy.alt} style={{ objectPosition: activeStudy.imagePosition ?? "center" }} />
+                <span>{activeStudy.eyebrow}</span>
+              </div>
+            ) : (
+              <div className="dialog-concept" aria-hidden="true"><span>{activeInsight?.title.slice(0, 1)}</span><i /></div>
+            )}
             <div className="dialog-body">
-              <p className="case-owner">{activeStudy.owner}</p>
-              <h2 id="case-title">{activeStudy.title}</h2>
-              <p className="dialog-statement">{activeStudy.statement}</p>
-              <p className="dialog-brief">{activeStudy.brief}</p>
+              <p className="case-owner">{activeStudy ? activeStudy.owner : activeInsight?.kicker}</p>
+              <h2 id="case-title">{activeDetail.title}</h2>
+              <p className="dialog-statement">{activeDetail.statement}</p>
+              <p className="dialog-brief">{activeDetail.brief}</p>
               <div className="dialog-columns">
-                <div><h3>The creative moves</h3><ul>{activeStudy.moves.map((move) => <li key={move}>{move}</li>)}</ul></div>
-                <div><h3>Proof in the work</h3><ul className="proof-list">{activeStudy.proof.map((proof) => <li key={proof}>{proof}</li>)}</ul></div>
+                <div><h3>{isCaseStudy ? "The creative moves" : "How we lead it"}</h3><ul>{activeDetail.moves.map((move) => <li key={move}>{move}</li>)}</ul></div>
+                <div><h3>{isCaseStudy ? "Proof in the work" : "Evidence"}</h3><ul className="proof-list">{activeDetail.proof.map((proof) => <li key={proof}>{proof}</li>)}</ul></div>
               </div>
             </div>
           </article>
