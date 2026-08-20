@@ -122,7 +122,6 @@ function DetailDialog({ detail, onDismiss }: { detail: Detail | null; onDismiss:
 
   return (
     <dialog ref={dialogRef} className="detail-dialog" aria-modal="true" aria-labelledby="detail-title" aria-describedby="detail-summary" onCancel={(event) => { event.preventDefault(); onDismiss(); }} onClose={restore} onKeyDown={trapDialogFocus}>
-      <button className="dialog-backdrop-close" type="button" tabIndex={-1} aria-label="Close detail dialog" onClick={onDismiss} />
       {detail && (
         <article className="dialog-panel" data-fit-check>
           <header className="dialog-toolbar"><div><span>{detail.detailType === "case" ? "Complete case file" : "Complete leadership lens"}</span><small>{detail.detailType === "case" ? `${detail.owner} · ${detail.role}` : detail.kicker}</small></div><button className="dialog-close" type="button" onClick={onDismiss}>Close <span aria-hidden="true">×</span></button></header>
@@ -136,6 +135,7 @@ function DetailDialog({ detail, onDismiss }: { detail: Detail | null; onDismiss:
           </div>
         </article>
       )}
+      <button className="dialog-backdrop-close" type="button" tabIndex={-1} aria-label="Close detail dialog" onClick={onDismiss} />
     </dialog>
   );
 }
@@ -184,8 +184,8 @@ function NavigationDialog({ open, onDismiss }: { open: boolean; onDismiss: () =>
 
   return (
     <dialog ref={dialogRef} id="presentation-navigation" className="nav-dialog" aria-modal="true" aria-labelledby="nav-title" onCancel={(event) => { event.preventDefault(); onDismiss(); }} onClose={restore} onKeyDown={trapDialogFocus}>
-      <button className="dialog-backdrop-close" type="button" tabIndex={-1} aria-label="Close presentation navigation" onClick={onDismiss} />
       <div className="nav-panel" data-fit-check><header><div><span>BRADD + STONE</span><h2 id="nav-title">Explore the story</h2></div><button className="nav-close" type="button" onClick={onDismiss}>Close <span aria-hidden="true">×</span></button></header><nav aria-label="Presentation chapters">{navItems.map((item) => <a key={item.href} href={item.href} onClick={(event) => navigate(event, item.href)}><span>{item.index}</span><strong>{item.label}</strong><small>{item.detail}</small><b aria-hidden="true">↘</b></a>)}</nav><a className="nav-contact" href="#contact" onClick={(event) => navigate(event, "#contact")}>Start a conversation <span aria-hidden="true">↗</span></a></div>
+      <button className="dialog-backdrop-close" type="button" tabIndex={-1} aria-label="Close presentation navigation" onClick={onDismiss} />
     </dialog>
   );
 }
