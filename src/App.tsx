@@ -11,7 +11,7 @@ import {
   type CaseStudy,
   type Insight,
 } from "./content";
-import { detectExperienceTier, sectionCues, type ExperienceSection, type ExperienceTier } from "./experience";
+import { detectExperienceTier, type ExperienceTier } from "./experience";
 
 const ExperienceCanvas = lazy(() => import("./ExperienceCanvas"));
 const loadMotionFeatures = () => import("./motionFeatures").then((module) => module.default);
@@ -162,35 +162,64 @@ export default function App() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [activeRange, setActiveRange] = useState<"play" | "collect" | "grow">("play");
   const [activePartner, setActivePartner] = useState(partners[0]);
-  const [activeSection, setActiveSection] = useState<ExperienceSection>("top");
   const [tier] = useState<ExperienceTier>(() => detectExperienceTier());
   const [pageVisible, setPageVisible] = useState(true);
+  const [heroProgress, setHeroProgress] = useState(0);
+  const [cinematicReady, setCinematicReady] = useState(false);
+  const [cinematicFailed, setCinematicFailed] = useState(false);
 
   useEffect(() => {
-    const onVisibility = () => setPageVisible(!document.hidden);
+    const onVisibility = () => {
+      const visible = !document.hidden;
+      setPageVisible(visible);
+      if (!visible) setCinematicReady(false);
+    };
+    let animationFrame = 0;
+    const updateHeroProgress = () => {
+      animationFrame = 0;
+      const hero = document.getElementById("top");
+      if (!hero) return;
+      const transitionDistance = Math.max(1, hero.offsetHeight - window.innerHeight);
+      const progress = Math.max(0, Math.min(1.2, window.scrollY / transitionDistance));
+      setHeroProgress((current) => Math.abs(current - progress) > 0.002 ? progress : current);
+      if (progress >= 1.16) setCinematicReady(false);
+    };
+    const requestHeroProgress = () => {
+      if (animationFrame) return;
+      animationFrame = requestAnimationFrame(updateHeroProgress);
+    };
+
     document.addEventListener("visibilitychange", onVisibility);
-    const observers = sectionCues.map((cue) => {
-      const element = document.getElementById(cue.id);
-      if (!element) return null;
-      const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) setActiveSection(cue.id); }, { rootMargin: "-36% 0px -42% 0px", threshold: 0 });
-      observer.observe(element);
-      return observer;
-    });
+    window.addEventListener("scroll", requestHeroProgress, { passive: true });
+    window.addEventListener("resize", requestHeroProgress);
+    animationFrame = requestAnimationFrame(updateHeroProgress);
+
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
-      observers.forEach((observer) => observer?.disconnect());
+      window.removeEventListener("scroll", requestHeroProgress);
+      window.removeEventListener("resize", requestHeroProgress);
+      cancelAnimationFrame(animationFrame);
     };
   }, []);
 
   const openInsight = (insight: Insight) => setDetail({ ...insight, detailType: "insight" });
   const openStudy = (study: CaseStudy) => setDetail({ ...study, detailType: "case" });
   const range = rangeInsights.find((item) => item.id === activeRange) ?? rangeInsights[0];
+  const collapse = Math.max(0, Math.min(1, (heroProgress - 0.68) / 0.28));
+  const wipe = Math.max(0, Math.min(1, (heroProgress - 0.84) / 0.13));
+  const release = heroProgress <= 1 ? 1 : Math.max(0, 1 - (heroProgress - 1) / 0.16);
+  const heroStyle = { "--hero-collapse": collapse } as CSSProperties;
+  const collapseStyle = {
+    "--wipe-radius": `${wipe * 132}vmax`,
+    "--wipe-opacity": wipe > 0 ? release : 0,
+  } as CSSProperties;
 
   return (
     <LazyMotion features={loadMotionFeatures} strict>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <div className="ambient" aria-hidden="true" />
-      {(tier === "webgl" || tier === "webgpu") && pageVisible && <Suspense fallback={null}><ExperienceCanvas activeSection={activeSection} rangeMode={activeRange} tier={tier} /></Suspense>}
+      {(tier === "webgl" || tier === "webgpu") && !cinematicFailed && pageVisible && heroProgress < 1.16 && <Suspense fallback={null}><ExperienceCanvas collapseProgress={collapse} onReady={() => setCinematicReady(true)} onFailure={() => { setCinematicReady(false); setCinematicFailed(true); }} tier={tier} /></Suspense>}
+      <div className="reality-collapse" style={collapseStyle} aria-hidden="true" />
       <div className="scroll-progress" aria-hidden="true"><span /></div>
 
       <header className="topbar">
@@ -200,14 +229,16 @@ export default function App() {
       </header>
 
       <main id="main-content">
-        <section className="hero" id="top" data-active={activeSection === "top"}>
-          <div className="hero-static-seed" aria-hidden="true"><span /><i /></div>
-          <Reveal className="hero-copy">
-            <p className="eyebrow">Two disciplines. One leadership system.</p>
-            <h1>We turn IP into worlds people can <em>play, collect, and grow.</em></h1>
-            <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="text-link" href="#team">Meet the partnership <span aria-hidden="true">↘</span></a></div>
-          </Reveal>
-          <nav className="signal-strip" aria-label="Explore leadership capabilities">{capabilityInsights.map((insight) => <button key={insight.id} type="button" onClick={() => openInsight(insight)}>{insight.title}<span aria-hidden="true">↗</span></button>)}</nav>
+        <section className="hero" id="top" style={heroStyle} data-enhanced={cinematicReady}>
+          <div className="hero-stage">
+            <div className="hero-orbit-fallback" aria-hidden="true"><span /><i /><b /></div>
+            <div className="hero-copy">
+              <p className="eyebrow">Two disciplines. One leadership system.</p>
+              <h1>We turn IP into worlds people can <em>play, collect, and grow.</em></h1>
+              <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="text-link" href="#team">Meet the partnership <span aria-hidden="true">↘</span></a></div>
+            </div>
+            <nav className="signal-strip" aria-label="Explore leadership capabilities">{capabilityInsights.map((insight) => <button key={insight.id} type="button" onClick={() => openInsight(insight)}>{insight.title}<span aria-hidden="true">↗</span></button>)}</nav>
+          </div>
         </section>
 
         <section className="team-section" id="team">

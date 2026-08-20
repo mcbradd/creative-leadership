@@ -73,7 +73,9 @@ test("ships a progressively enhanced single-canvas experience", async () => {
   assert.match(experience, /saveData/);
   assert.match(canvas, /frameloop="demand"/);
   assert.match(canvas, /powerPreference: "high-performance"/);
-  assert.match(canvas, /Math\.min\(window\.devicePixelRatio, 1\.5\)/);
+  assert.match(canvas, /collapseProgress/);
+  assert.match(canvas, /fragmentShader/);
+  assert.doesNotMatch(canvas, /ParticleResolve|<points|WorldSeed/);
 });
 
 test("keeps representation balanced in the featured case sequence", async () => {
