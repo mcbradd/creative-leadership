@@ -113,9 +113,9 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   float da = mod(atan(hit.z, hit.x) - ak + 3.14159265, 6.28318531) - 3.14159265;
   float dr = r - rk;
   float head = exp(-da * da / 0.022 - dr * dr / 0.42);
-  float tail = smoothstep(0.0, 0.10, da) * exp(-da * 1.15) * exp(-dr * dr / (0.55 + da * 0.85));
+  float tail = smoothstep(0.0, 0.10, da) * smoothstep(3.05, 1.70, da) * exp(-da * 1.15) * exp(-dr * dr / (0.55 + da * 0.85));
   float debris = head + tail * 0.42 * (0.45 + 0.85 * strands);
-  density = clamp(density + debris * edge * 0.62, 0.0, 1.55);
+  density = clamp(density + debris * edge * 0.42, 0.0, 1.20);
 
   // Relativistic beaming plus gravitational redshift.
   float speed = sqrt(RS / (2.0 * max(r, DISK_IN)));
@@ -124,7 +124,7 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   float gamma = inversesqrt(max(1.0 - speed * speed, 1e-3));
   float doppler = 1.0 / (gamma * (1.0 - dot(vel, toObs)));
   float grav = sqrt(max(1.0 - RS / max(r, RS * 1.05), 1e-3));
-  float shift = clamp(doppler * grav, 0.22, 2.8);
+  float shift = clamp(doppler * grav, 0.46, 2.8);
   float beam = pow(shift, 2.3);
 
   vec3 col = diskPalette(t);
@@ -134,6 +134,28 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   // The head runs hotter than the gas around it and drags a cyan-lit trail.
   col += vec3(1.00, 0.72, 0.94) * head * 1.45;
   col += vec3(0.42, 0.90, 1.00) * tail * 0.42;
+
+  // The body itself is opaque, so it reads as a silhouette rather than a bright
+  // patch of gas. Its outline is an fbm-perturbed radius, and the only light on
+  // it comes from the disk and the hole it is falling into, which puts a hard
+  // terminator across it and an ablation rim on the leading edge.
+  vec2 bodyC = vec2(cos(ak), sin(ak)) * rk;
+  vec2 bd = hit.xz - bodyC;
+  float bdist = length(bd);
+  float bang = atan(bd.y, bd.x);
+  float bR = 0.22 * (1.0 + 0.34 * fbm(vec2(cos(bang), sin(bang)) * 2.6 + 11.0));
+  if (bdist < bR) {
+    float facing = dot(normalize(-bodyC), bdist > 1e-4 ? bd / bdist : vec2(0.0, 1.0));
+    float lit = smoothstep(0.30, -0.85, facing);
+    float relief = fbm(bd * 11.0 + 4.0);
+    float limb = smoothstep(bR, bR * 0.55, bdist);
+    vec3 rock = mix(vec3(0.020, 0.014, 0.052), vec3(0.30, 0.16, 0.44), lit * (0.55 + 0.75 * relief));
+    // Leading edge boiling off into the stream.
+    rock += vec3(1.00, 0.40, 0.78) * pow(lit, 2.2) * (0.30 + 0.60 * relief) * 0.85;
+    rock += vec3(0.55, 0.92, 1.00) * (1.0 - limb) * 0.22;
+    alpha = 1.0;
+    return rock;
+  }
 
   alpha = clamp(density * 1.15, 0.0, 1.0);
   return col * (0.9 + 1.6 * density);
@@ -183,6 +205,7 @@ vec3 trace(vec3 ro, vec3 rd) {
 
   vec3 pos = ro;
   bool escaped = false;
+  bool captured = false;
   vec3 exitDir = rd;
 
   for (int i = 0; i < 420; i++) {
@@ -214,7 +237,7 @@ vec3 trace(vec3 ro, vec3 rd) {
 
     if (u <= 1e-4) { escaped = true; break; }
     r = 1.0 / u;
-    if (r <= RS * 1.015) break;
+    if (r <= RS * 1.015) { captured = true; break; }
 
     vec3 next = (cos(phi) * e1 + sin(phi) * e2) * r;
 
@@ -237,7 +260,10 @@ vec3 trace(vec3 ro, vec3 rd) {
     if (transmit < 0.01) break;
   }
 
-  if (escaped && transmit > 0.001) acc += transmit * skyColor(exitDir);
+  // Only a ray that actually crossed the horizon comes back black. A ray that
+  // merely ran out of integration budget still has to return the sky, or the
+  // shadow grows a hard, faceted edge wherever the step count ran out.
+  if (!captured && transmit > 0.001) acc += transmit * skyColor(exitDir);
   return acc;
 }
 
@@ -440,6 +466,17 @@ vec3 hudMarks(vec2 f, vec2 res, float t) {
   float longTick = step(0.86, fract(aang * 30.0 + t * 0.008));
   float reach = mix(5.0, 11.0, longTick);
   col += cyan * isTick * arcMask * smoothstep(reach, 0.0, abs(adist - ar - reach * 0.5)) * 0.42;
+
+  // A short survey rule in the upper left, matching the fine tick clusters in
+  // the reference frame.
+  vec2 rulerO = vec2(res.x * 0.045, res.y * 0.966);
+  vec2 rq = f - rulerO;
+  float along = rq.x / (res.x * 0.085);
+  float rule = smoothstep(1.2, 0.0, abs(rq.y)) * smoothstep(1.02, 0.98, along) * step(0.0, along);
+  float rtick = smoothstep(0.14, 0.0, min(fract(along * 26.0), 1.0 - fract(along * 26.0)));
+  float rlen = mix(3.5, 8.0, step(0.86, fract(along * 6.5)));
+  float ticks = rtick * smoothstep(rlen, 0.0, abs(rq.y - rlen * 0.5)) * step(0.0, along) * step(along, 1.0);
+  col += cyan * (rule * 0.20 + ticks * 0.24);
 
   // Registration crosshairs.
   for (int i = 0; i < 3; i++) {

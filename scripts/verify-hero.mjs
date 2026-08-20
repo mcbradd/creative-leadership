@@ -16,6 +16,10 @@ const VIEWS = [
   { name: "desktop", viewport: { width: 1440, height: 900 }, scale: 1 },
   { name: "laptop", viewport: { width: 1180, height: 800 }, scale: 1 },
   { name: "mobile", viewport: { width: 390, height: 844 }, scale: 2 },
+  // iPhone 15 Pro at its real DPR, with the CPU throttled to stand in for a
+  // phone. It is a proxy, not the device: only a real handset settles whether
+  // the quality governor holds its tier.
+  { name: "iphone", viewport: { width: 393, height: 852 }, scale: 3, cpuThrottle: 4 },
 ];
 
 const site = await startSite();
@@ -39,6 +43,10 @@ for (const view of VIEWS) {
     reducedMotion: "no-preference",
   });
   const page = await context.newPage();
+  if (view.cpuThrottle) {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: view.cpuThrottle });
+  }
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
