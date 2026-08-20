@@ -47,11 +47,50 @@ describe("mobile-first executive one-pager interactions", () => {
       const partnershipLink = hero.locator('a[href="#team"]');
       assert.equal(await partnershipLink.count(), 1);
       assert.equal(await partnershipLink.evaluate((link) => link.tagName), "A");
+      assert.equal(
+        (await partnershipLink.locator("span").textContent())?.replace(/\s+/g, " ").trim(),
+        "Super-Powers Combined",
+        "the teaser CTA must use the approved executive-facing label",
+      );
       await partnershipLink.focus();
       await page.keyboard.press("Enter");
       await page.waitForFunction(() => window.location.hash === "#team");
       assert.equal(await page.evaluate(() => window.location.hash), "#team");
       assert.equal(await page.locator("#team .leader-card").count(), 2);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("visible identity copy consistently styles the given names as BRADD and STONE", async () => {
+    const { page, context } = await pageFor();
+    try {
+      const displayedNames = await page.locator("#team .leader-copy > strong").allTextContents();
+      assert.deepEqual(displayedNames, ["BRADD McBrearty", "STONE Perales"]);
+
+      const mixedCaseNames = await page.evaluate(() => {
+        const offenders = [];
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          const text = node.textContent?.replace(/\s+/g, " ").trim() ?? "";
+          if (!/\b(?:Bradd|Stone)\b/.test(text)) continue;
+          const element = node.parentElement;
+          if (!element || element.closest('[aria-hidden="true"], script, style, noscript, dialog:not([open])')) continue;
+
+          let hidden = false;
+          for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+            const style = getComputedStyle(ancestor);
+            if (style.display === "none" || style.visibility === "hidden") {
+              hidden = true;
+              break;
+            }
+          }
+          if (!hidden) offenders.push(text);
+        }
+        return [...new Set(offenders)];
+      });
+      assert.deepEqual(mixedCaseNames, [], `visible copy contains mixed-case given names: ${mixedCaseNames.join(" | ")}`);
     } finally {
       await context.close();
     }

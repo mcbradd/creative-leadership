@@ -21,6 +21,7 @@ const LEADER_CARD_VIEWPORTS = [
   ...CANONICAL_VIEWPORTS.slice(0, 3),
   CANONICAL_VIEWPORTS.find(([name]) => name === "desktop-1440x900"),
 ];
+const LOWER_CARD_VIEWPORTS = CANONICAL_VIEWPORTS.slice(0, 3);
 const SECTION_HEADINGS = [
   ["partnership", "#team h2"],
   ["joint proof", "#proof h2"],
@@ -342,6 +343,200 @@ describe("responsive layout contract", () => {
       } finally {
         await context.close();
       }
+    }
+  });
+
+  test("mobile lower profile and evidence cards stack in one readable, contained column", async () => {
+    for (const [name, viewport] of LOWER_CARD_VIEWPORTS) {
+      const { context, page, faults } = await openAuditedPage(viewport);
+      try {
+        await page.locator(".dual-timeline").scrollIntoViewIfNeeded();
+        const report = await page.locator(".dual-timeline").evaluate((timeline) => {
+          const bounds = (element) => {
+            const rect = element.getBoundingClientRect();
+            return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+          };
+          const inspectChildren = (container) => {
+            const containerRect = bounds(container);
+            return [...container.children].map((child) => ({
+              rect: bounds(child),
+              text: child.textContent?.replace(/\s+/g, " ").trim() ?? "",
+              clientWidth: child.clientWidth,
+              scrollWidth: child.scrollWidth,
+              clientHeight: child.clientHeight,
+              scrollHeight: child.scrollHeight,
+              descendants: [...child.children].map((descendant) => ({
+                text: descendant.textContent?.replace(/\s+/g, " ").trim() ?? "",
+                rect: bounds(descendant),
+              })),
+            })).map((item) => ({ ...item, containerRect }));
+          };
+
+          const profileHead = timeline.querySelector(".timeline-head");
+          return {
+            profiles: profileHead ? inspectChildren(profileHead) : [],
+            evidenceRows: [...timeline.querySelectorAll(".timeline-row")].map((row) => ({
+              row: bounds(row),
+              articles: inspectChildren(row).filter((item) => item.text && item.rect.width > 44),
+            })),
+          };
+        });
+
+        assert.equal(report.profiles.length, 2, `${name} must render both lower profile cards`);
+        for (const [index, profile] of report.profiles.entries()) {
+          assert.ok(Math.abs(profile.rect.width - profile.containerRect.width) <= EPSILON, `${name} profile ${index + 1} is not a full-width mobile card`);
+          assert.ok(profile.scrollWidth <= profile.clientWidth + EPSILON, `${name} profile ${index + 1} has horizontal overflow`);
+          assert.ok(profile.scrollHeight <= profile.clientHeight + EPSILON, `${name} profile ${index + 1} has vertical overflow`);
+          for (const child of profile.descendants) {
+            assert.ok(child.rect.left >= profile.rect.left - EPSILON && child.rect.right <= profile.rect.right + EPSILON, `${name} profile ${index + 1} text escapes horizontally: ${child.text}`);
+            assert.ok(child.rect.top >= profile.rect.top - EPSILON && child.rect.bottom <= profile.rect.bottom + EPSILON, `${name} profile ${index + 1} text escapes vertically: ${child.text}`);
+          }
+        }
+        assert.ok(report.profiles[1].rect.top >= report.profiles[0].rect.bottom - EPSILON, `${name} lower profile cards remain side-by-side instead of stacking`);
+
+        assert.ok(report.evidenceRows.length > 0, `${name} must render lower evidence rows`);
+        for (const [rowIndex, evidence] of report.evidenceRows.entries()) {
+          assert.equal(evidence.articles.length, 2, `${name} evidence row ${rowIndex + 1} must contain two articles`);
+          for (const [articleIndex, article] of evidence.articles.entries()) {
+            assert.ok(Math.abs(article.rect.width - evidence.row.width) <= EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} is not full width`);
+            assert.ok(article.scrollWidth <= article.clientWidth + EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} has horizontal overflow`);
+            assert.ok(article.scrollHeight <= article.clientHeight + EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} has vertical overflow`);
+            for (const child of article.descendants) {
+              assert.ok(child.rect.left >= article.rect.left - EPSILON && child.rect.right <= article.rect.right + EPSILON, `${name} evidence text escapes horizontally: ${child.text}`);
+              assert.ok(child.rect.top >= article.rect.top - EPSILON && child.rect.bottom <= article.rect.bottom + EPSILON, `${name} evidence text escapes vertically: ${child.text}`);
+            }
+          }
+          assert.ok(evidence.articles[1].rect.top >= evidence.articles[0].rect.bottom - EPSILON, `${name} evidence row ${rowIndex + 1} remains side-by-side instead of stacking`);
+        }
+
+        await assertDocumentHasNoHorizontalOverflow(page, `${name} lower cards`);
+        await assertNoFaults(page, faults, `${name} lower cards`);
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
+  test("mobile lower-card labels, actions, and notes keep a readable type floor", async () => {
+    for (const [name, viewport] of LOWER_CARD_VIEWPORTS) {
+      const { context, page, faults } = await openAuditedPage(viewport);
+      try {
+        const floors = [
+          [".timeline-head > button > span", 10],
+          [".timeline-head > button > small", 10],
+          [".timeline-row article > span", 10],
+          [".timeline-row article > p", 12],
+        ];
+        const undersized = [];
+        for (const [selector, minimum] of floors) {
+          const items = await page.locator(selector).evaluateAll((elements) => elements.map((element) => ({
+            text: element.textContent?.replace(/\s+/g, " ").trim() ?? "",
+            size: Number.parseFloat(getComputedStyle(element).fontSize),
+          })));
+          for (const item of items) {
+            if (item.size < minimum - 0.05) undersized.push({ selector, minimum, ...item });
+          }
+        }
+        assert.deepEqual(undersized, [], `${name} lower-card type falls below its readable mobile floor`);
+        await assertNoFaults(page, faults, `${name} lower-card typography`);
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
+  test("rectangular container surfaces are square while approved visual motifs stay circular", async () => {
+    const [name, viewport] = CANONICAL_VIEWPORTS[1];
+    const { context, page, faults } = await openAuditedPage(viewport);
+    try {
+      const surfaceSelectors = [
+        ".leader-card",
+        ".portrait-wrap",
+        ".leader-copy",
+        ".proof-visual",
+        ".range-visual",
+        ".partner-detail",
+        ".case-card",
+        ".collab-art",
+        ".supporting-card",
+        ".mentor-columns",
+      ];
+      const inspect = async (selector) => page.locator(selector).first().evaluate((element, inspectedSelector) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          selector: inspectedSelector,
+          width: rect.width,
+          height: rect.height,
+          corners: [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius],
+        };
+      }, selector);
+
+      const surfaces = [];
+      for (const selector of surfaceSelectors) surfaces.push(await inspect(selector));
+
+      await page.locator("#team .leader-card").first().click();
+      await page.locator("dialog.detail-dialog[open] .dialog-panel").waitFor({ state: "visible" });
+      surfaces.push(await inspect("dialog.detail-dialog[open] .dialog-panel"));
+      const dialogDot = await inspect("dialog.detail-dialog[open] .dialog-concept b");
+      await page.keyboard.press("Escape");
+
+      await page.getByRole("button", { name: "Open presentation navigation" }).click();
+      await page.locator("dialog.nav-dialog[open] .nav-panel").waitFor({ state: "visible" });
+      surfaces.push(await inspect("dialog.nav-dialog[open] .nav-panel"));
+      await page.keyboard.press("Escape");
+
+      await page.locator("#contact .copy-action").click();
+      await page.locator(".toast.toast-visible").waitFor({ state: "visible" });
+      surfaces.push(await inspect(".toast.toast-visible"));
+      const toastIcon = await inspect(".toast.toast-visible > span");
+      await page.getByRole("button", { name: "Dismiss notification" }).click();
+
+      const roundedSurfaces = surfaces.filter((surface) => surface.corners.some((corner) => Number.parseFloat(corner) > EPSILON));
+      assert.deepEqual(roundedSurfaces, [], `${name} rectangular surfaces still have rounded corners`);
+
+      const motifs = [
+        await inspect(".hero-orbit"),
+        await inspect(".hero-orbit > span"),
+        await inspect(".proof-stamp"),
+        await inspect(".timeline-index"),
+        await inspect(".mentorship-ripple i"),
+        dialogDot,
+        toastIcon,
+      ];
+      for (const motif of motifs) {
+        assert.ok(Math.abs(motif.width - motif.height) <= EPSILON, `${name} ${motif.selector} is no longer square enough to form a circle`);
+        assert.ok(motif.corners.every((corner) => corner === "50%" || Number.parseFloat(corner) >= Math.min(motif.width, motif.height) / 2 - EPSILON), `${name} ${motif.selector} is no longer circular`);
+      }
+      await assertNoFaults(page, faults, `${name} corner language`);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("every section-heading emphasis shares the lava-flow treatment and honors reduced motion", async () => {
+    const [name, viewport] = CANONICAL_VIEWPORTS[1];
+    const { context, page, faults } = await openAuditedPage(viewport);
+    try {
+      const emphasis = page.locator("main > section:not(.hero) h2 > em");
+      const reports = await emphasis.evaluateAll((elements) => elements.map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          text: element.textContent?.replace(/\s+/g, " ").trim() ?? "",
+          hasHook: element.classList.contains("lava-flow"),
+          backgroundImage: style.backgroundImage,
+          backgroundClip: style.backgroundClip || style.webkitBackgroundClip,
+          runningAnimations: element.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running").length,
+        };
+      }));
+      assert.equal(reports.length, 9, `${name} should render one emphasized payoff in every numbered section heading`);
+      assert.ok(reports.every((report) => report.hasHook), `${name} section emphasis is missing the shared .lava-flow hook: ${JSON.stringify(reports)}`);
+      assert.ok(reports.every((report) => report.backgroundImage !== "none" && report.backgroundClip === "text"), `${name} lava-flow emphasis is missing its clipped color treatment`);
+      assert.ok(reports.every((report) => report.runningAnimations === 0), `${name} lava-flow emphasis keeps animating with reduced motion enabled`);
+      assert.equal(new Set(reports.map((report) => report.backgroundImage)).size, 1, `${name} section emphases do not share one lava-flow style`);
+      await assertNoFaults(page, faults, `${name} lava-flow emphasis`);
+    } finally {
+      await context.close();
     }
   });
 

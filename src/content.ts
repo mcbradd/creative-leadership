@@ -94,7 +94,7 @@ export const capabilityInsights: Insight[] = [
 export const leaderInsights: Record<"bradd" | "stone", Insight> = {
   bradd: {
     id: "bradd-profile",
-    title: "Bradd McBrearty",
+    title: "BRADD McBrearty",
     kicker: "Creative Director · Game + Product Leadership",
     statement: "He builds the bridge between an ambitious idea and the team, technology, and product logic required to ship it.",
     brief: "Bradd combines creative direction, game design, technical fluency, production recovery, product strategy, and executive communication—especially where a project needs a credible path through uncertainty.",
@@ -105,7 +105,7 @@ export const leaderInsights: Record<"bradd" | "stone", Insight> = {
   },
   stone: {
     id: "stone-profile",
-    title: "Stone Perales",
+    title: "STONE Perales",
     kicker: "Art Director · Worlds + Franchise Systems",
     statement: "He gives worlds a visual grammar strong enough to survive the jump from screen to shelf to play.",
     brief: "Stone brings franchise art direction, collectible instincts, worldbuilding, licensed-product stewardship, and the ability to align large creative networks around a distinctive, repeatable visual standard.",
