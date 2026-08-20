@@ -98,7 +98,7 @@ function ArchiveCard({ definition, texture, sceneRef, index }: { definition: Arc
   return (
     <group ref={narrative} position={initial.position} rotation={initial.rotation} scale={initial.scale}>
       <group ref={breathing}>
-        <mesh renderOrder={10 + index}>
+        <mesh>
           <planeGeometry args={[definition.width, definition.height, 1, 1]} />
           <meshBasicMaterial ref={material} map={texture} color="#ffffff" transparent opacity={initial.opacity} depthWrite={false} toneMapped={false} />
         </mesh>
