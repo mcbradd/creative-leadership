@@ -62,7 +62,15 @@ h2 em.lava-flow { color: transparent; background-image: conic-gradient(from 108d
 .menu-button i { display: block; width: 15px; height: 1px; background: currentColor; }
 
 .hero { display: flex; min-height: 100svh; overflow: hidden; border-bottom: 1px solid var(--line); background: #030509; }
-.hero-grid { position: absolute; inset: 0; pointer-events: none; opacity: .58; background: linear-gradient(rgba(114,228,255,.038) 1px, transparent 1px), linear-gradient(90deg, rgba(114,228,255,.038) 1px, transparent 1px), radial-gradient(circle at 78% 32%, rgba(114,228,255,.13), transparent 28%), radial-gradient(circle at 12% 72%, rgba(170,145,255,.1), transparent 30%); background-size: 56px 56px, 56px 56px, auto, auto; mask-image: linear-gradient(to bottom, #000, rgba(0,0,0,.42) 76%, transparent); }
+/* Lensed backdrop sits under the instrument furniture and fades out before the
+   footer copy. No animation here on purpose: the hero's running-animation set is
+   contract-tested, and the scene animates entirely inside the shader. */
+.hero-void { position: absolute; z-index: 0; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; mask-image: linear-gradient(to bottom, #000 58%, rgba(0,0,0,.5) 82%, transparent); }
+/* The lensed backdrop is the hero surface once it is live; the tiled grid is
+   fallback texture for the static and motion tiers only. */
+.hero[data-static="false"] .hero-grid { opacity: 0; }
+.hero[data-static="false"] .hero-orbit { opacity: .5; }
+.hero-grid { position: absolute; z-index: 1; inset: 0; pointer-events: none; opacity: .58; background: linear-gradient(rgba(114,228,255,.038) 1px, transparent 1px), linear-gradient(90deg, rgba(114,228,255,.038) 1px, transparent 1px), radial-gradient(circle at 78% 32%, rgba(114,228,255,.13), transparent 28%), radial-gradient(circle at 12% 72%, rgba(170,145,255,.1), transparent 30%); background-size: 56px 56px, 56px 56px, auto, auto; mask-image: linear-gradient(to bottom, #000, rgba(0,0,0,.42) 76%, transparent); }
 .hero-light-field { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: none; mask-image: linear-gradient(to bottom, #000 5%, rgba(0,0,0,.76) 70%, transparent); }
 .hero-light-field i { position: absolute; display: block; opacity: 0; pointer-events: none; }
 .hero-light-field i:first-child { top: 224px; left: -38vw; width: 38vw; height: 1px; background: linear-gradient(90deg,transparent,rgba(114,228,255,.22),var(--cyan),rgba(244,241,232,.9),transparent); box-shadow: 0 0 12px rgba(114,228,255,.72); }

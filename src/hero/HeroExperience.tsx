@@ -1,237 +1,467 @@
-/* eslint-disable react-hooks/immutability, react/no-unknown-property */
-import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Component, useCallback, useEffect, useMemo, useRef } from "react";
-import type { MutableRefObject, ReactNode } from "react";
-import * as THREE from "three";
+/* Gravitational-lensing hero backdrop.
+   One fullscreen triangle; every pixel integrates a photon geodesic backwards
+   from the camera through Schwarzschild spacetime, so the lensing, the photon
+   ring and the disk arcing over the shadow are solved rather than painted.
+   Deliberately dependency-free: a scene graph would cost more than it renders. */
+import { useEffect, useRef } from "react";
+
+const VERTEX_SOURCE = `#version 300 es
+precision highp float;
+out vec2 vNdc;
+void main() {
+  vec2 corner = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  vNdc = corner * 2.0 - 1.0;
+  gl_Position = vec4(vNdc, 0.0, 1.0);
+}`;
+
+const FRAGMENT_SOURCE = `#version 300 es
+precision highp float;
+
+in vec2 vNdc;
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform float uTime;
+uniform float uSteps;
+uniform float uOctaves;
+uniform vec2  uCenter;
+uniform float uScale;
+uniform float uIncl;
+uniform float uExposure;
+uniform float uReveal;
+uniform vec2 uGuard;
+
+const float RS       = 1.0;
+const float DISK_IN  = 2.6;
+const float DISK_OUT = 13.0;
+
+float hash21(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+
+float hash31(vec3 p) {
+  p = fract(p * 0.3183099 + 0.1);
+  p *= 17.0;
+  return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+  float sum = 0.0;
+  float amp = 0.5;
+  for (int i = 0; i < 6; i++) {
+    if (float(i) >= uOctaves) break;
+    sum += amp * vnoise(p);
+    p = p * 2.02 + vec2(1.7, 9.2);
+    amp *= 0.5;
+  }
+  return sum;
+}
+
+// Inner edge runs white-hot, the rim falls away to a dull ember.
+vec3 diskPalette(float t) {
+  vec3 core  = vec3(1.00, 0.97, 0.92);
+  vec3 gold  = vec3(1.00, 0.74, 0.36);
+  vec3 amber = vec3(0.95, 0.41, 0.12);
+  vec3 rim   = vec3(0.38, 0.12, 0.05);
+  vec3 c = mix(core, gold, smoothstep(0.0, 0.26, t));
+  c = mix(c, amber, smoothstep(0.20, 0.60, t));
+  c = mix(c, rim, smoothstep(0.58, 1.0, t));
+  return c;
+}
+
+vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
+  float r = length(hit.xz);
+  float t = clamp((r - DISK_IN) / (DISK_OUT - DISK_IN), 0.0, 1.0);
+  float edge = smoothstep(0.0, 0.09, t) * (1.0 - smoothstep(0.70, 1.0, t));
+
+  // Keplerian shear: inner gas laps the outer, so the turbulence winds up.
+  float omega = 1.45 * pow(max(r, DISK_IN), -1.5);
+  float ang = atan(hit.z, hit.x) + uTime * omega;
+  vec2 q = vec2(cos(ang), sin(ang)) * (1.7 + r * 0.44);
+
+  float turb = fbm(q * 1.9 + vec2(0.0, r * 0.55));
+  float strands = fbm(q * 5.6 - vec2(r * 1.15, 0.0));
+  float density = edge * (0.40 + 0.90 * turb) * (0.52 + 0.76 * strands);
+  density *= pow(1.0 - t, 0.80);
+
+  // Relativistic beaming plus gravitational redshift.
+  float speed = sqrt(RS / (2.0 * max(r, DISK_IN)));
+  vec3 vel = normalize(cross(vec3(0.0, 1.0, 0.0), hit)) * speed;
+  vec3 toObs = -marchDir;
+  float gamma = inversesqrt(max(1.0 - speed * speed, 1e-3));
+  float doppler = 1.0 / (gamma * (1.0 - dot(vel, toObs)));
+  float grav = sqrt(max(1.0 - RS / max(r, RS * 1.05), 1e-3));
+  float shift = clamp(doppler * grav, 0.22, 2.8);
+  float beam = pow(shift, 2.3);
+
+  vec3 col = diskPalette(t);
+  col = mix(col, vec3(0.68, 0.85, 1.00), clamp((shift - 1.0) * 0.5, 0.0, 0.5));
+  col *= beam;
+
+  alpha = clamp(density * 1.15, 0.0, 1.0);
+  return col * (0.9 + 1.6 * density);
+}
+
+vec3 skyColor(vec3 dir) {
+  vec3 col = vec3(0.0);
+  float scale = 58.0;
+  for (int layer = 0; layer < 3; layer++) {
+    vec3 p = dir * scale;
+    vec3 cell = floor(p);
+    vec3 f = p - cell - 0.5;
+    if (hash31(cell) > 0.948) {
+      vec3 jitter = vec3(hash31(cell + 11.0), hash31(cell + 23.0), hash31(cell + 37.0)) - 0.5;
+      float d = length(f - jitter * 0.7);
+      float spark = exp(-d * d * 210.0);
+      vec3 tint = mix(vec3(0.60, 0.75, 1.00), vec3(1.00, 0.87, 0.70), hash31(cell + 5.0));
+      col += tint * spark * (0.30 + 0.70 * hash31(cell + 3.0));
+    }
+    scale *= 2.3;
+  }
+  // Barely-there dust so the void is not a flat black.
+  float dust = fbm(vec2(dir.x * 2.1 + dir.z * 0.7, dir.y * 2.3 + dir.z * 0.4) * 1.5);
+  col += vec3(0.030, 0.045, 0.078) * dust * dust;
+  return col;
+}
+
+vec3 trace(vec3 ro, vec3 rd) {
+  vec3 acc = vec3(0.0);
+  float transmit = 1.0;
+
+  vec3 nrm = cross(ro, rd);
+  float nl = length(nrm);
+  if (nl < 1e-5) return vec3(0.0);
+  nrm /= nl;
+
+  vec3 e1 = normalize(ro);
+  vec3 e2 = normalize(cross(nrm, e1));
+
+  float r = length(ro);
+  float tangential = dot(rd, e2);
+  if (abs(tangential) < 1e-5) return vec3(0.0);
+
+  float u = 1.0 / r;
+  float du = -dot(rd, e1) / (r * tangential);
+  float phi = 0.0;
+
+  vec3 pos = ro;
+  bool escaped = false;
+  vec3 exitDir = rd;
+
+  for (int i = 0; i < 420; i++) {
+    if (float(i) >= uSteps) break;
+
+    // Short arcs deep in the well, long strides out in the flat region.
+    float dphi = clamp(0.13 / (u * 5.0 + 0.32), 0.012, 0.11);
+
+    // RK4 on the Binet orbit equation: u'' = -u + 1.5 * RS * u^2
+    float a1 = du;
+    float b1 = -u + 1.5 * RS * u * u;
+    float ua = u + 0.5 * dphi * a1;
+    float da = du + 0.5 * dphi * b1;
+    float a2 = da;
+    float b2 = -ua + 1.5 * RS * ua * ua;
+    float ub = u + 0.5 * dphi * a2;
+    float db = du + 0.5 * dphi * b2;
+    float a3 = db;
+    float b3 = -ub + 1.5 * RS * ub * ub;
+    float uc = u + dphi * a3;
+    float dc = du + dphi * b3;
+    float a4 = dc;
+    float b4 = -uc + 1.5 * RS * uc * uc;
+
+    u += (dphi / 6.0) * (a1 + 2.0 * a2 + 2.0 * a3 + a4);
+    du += (dphi / 6.0) * (b1 + 2.0 * b2 + 2.0 * b3 + b4);
+    phi += dphi;
+
+    if (u <= 1e-4) { escaped = true; break; }
+    r = 1.0 / u;
+    if (r <= RS * 1.015) break;
+
+    vec3 next = (cos(phi) * e1 + sin(phi) * e2) * r;
+
+    if (pos.y * next.y < 0.0) {
+      float k = pos.y / (pos.y - next.y);
+      vec3 hit = mix(pos, next, k);
+      float hr = length(hit.xz);
+      if (hr > DISK_IN && hr < DISK_OUT) {
+        float alpha;
+        vec3 emit = sampleDisk(hit, normalize(next - pos), alpha);
+        acc += emit * alpha * transmit;
+        transmit *= (1.0 - clamp(alpha, 0.0, 1.0));
+      }
+    }
+
+    exitDir = normalize(next - pos);
+    pos = next;
+
+    if (r > 70.0 && du < 0.0) { escaped = true; break; }
+    if (transmit < 0.01) break;
+  }
+
+  if (escaped && transmit > 0.001) acc += transmit * skyColor(exitDir);
+  return acc;
+}
+
+vec3 tonemap(vec3 x) {
+  const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+void main() {
+  float aspect = uRes.x / uRes.y;
+  vec2 sc = vec2(vNdc.x * aspect, vNdc.y) - uCenter;
+
+  float az = uTime * 0.011;
+  float ci = cos(uIncl);
+  vec3 ro = vec3(sin(az) * ci, sin(uIncl), cos(az) * ci) * 15.5;
+  vec3 fwd = normalize(-ro);
+  vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), fwd));
+  vec3 up = cross(fwd, right);
+  vec3 rd = normalize(fwd + (sc.x * right + sc.y * up) * uScale);
+
+  vec3 col = trace(ro, rd);
+
+  // The headline must stay the brightest thing on the page: wide viewports
+  // clear it sideways, narrow ones clear it upward over the stacked type.
+  col *= mix(1.0, smoothstep(-1.15, 0.30, vNdc.x * aspect), uGuard.x);
+  col *= mix(1.0, smoothstep(-0.72, 0.42, vNdc.y), uGuard.y);
+  col *= uExposure * uReveal;
+  col = tonemap(col);
+  col += (hash21(gl_FragCoord.xy * 0.7 + uTime) - 0.5) * 0.005;
+
+  fragColor = vec4(max(col, vec3(0.0)), 1.0);
+}`;
 
 export type HeroExperienceProps = {
   active: boolean;
   className?: string;
-  sceneRef: MutableRefObject<number>;
   onFailure: () => void;
   onReady?: () => void;
 };
 
-type ArchiveCardId = "bradd" | "stone" | "play" | "collect" | "grow";
-type Pose = { opacity: number; position: [number, number, number]; rotation: [number, number, number]; scale: number };
-type ArchiveCardDefinition = { height: number; id: ArchiveCardId; image: string; width: number };
+type QualityTier = { dpr: number; octaves: number; steps: number };
 
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
-const media = (file: string) => `${basePath}/media/${file}`;
+// Index 0 is the ceiling; the frame-time governor walks down from wherever the
+// device probe starts it.
+const QUALITY_TIERS: readonly QualityTier[] = [
+  { steps: 260, octaves: 5, dpr: 1.5 },
+  { steps: 200, octaves: 4, dpr: 1.25 },
+  { steps: 150, octaves: 4, dpr: 1.0 },
+  { steps: 110, octaves: 3, dpr: 0.85 },
+  { steps: 80, octaves: 2, dpr: 0.7 },
+];
 
-const CARDS: readonly ArchiveCardDefinition[] = [
-  { id: "bradd", image: media("bradd-portrait.webp"), width: 2.65, height: 3.32 },
-  { id: "stone", image: media("stone-portrait.webp"), width: 2.65, height: 3.32 },
-  { id: "play", image: media("tetris-beat-gameplay.webp"), width: 4.75, height: 2.67 },
-  { id: "collect", image: media("stone-raid-hires.webp"), width: 2.75, height: 3.7 },
-  { id: "grow", image: media("stone-chaotic-hires.webp"), width: 4.15, height: 2.85 },
-] as const;
+type Signals = Navigator & { deviceMemory?: number };
 
-const POSES: Record<ArchiveCardId, readonly Pose[]> = {
-  bradd: [
-    { position: [0.65, -0.85, -1.55], rotation: [-0.02, 0.16, -0.018], scale: 0.78, opacity: 0.96 },
-    { position: [0.7, -0.02, 0.15], rotation: [0, 0.08, -0.012], scale: 1.02, opacity: 1 },
-    { position: [-5.2, 1.15, -5.2], rotation: [0, 0.28, -0.04], scale: 0.78, opacity: 0.32 },
-    { position: [-4.8, -1.25, -5.8], rotation: [0, 0.2, -0.04], scale: 0.72, opacity: 0.22 },
-  ],
-  stone: [
-    { position: [3.35, -0.42, -0.95], rotation: [0.02, -0.18, 0.02], scale: 0.9, opacity: 1 },
-    { position: [3.35, -0.02, 0.25], rotation: [0, -0.08, 0.012], scale: 1.06, opacity: 1 },
-    { position: [5.2, 1.05, -5.4], rotation: [0, -0.28, 0.04], scale: 0.78, opacity: 0.32 },
-    { position: [4.9, 1.4, -6], rotation: [0, -0.2, 0.04], scale: 0.72, opacity: 0.22 },
-  ],
-  play: [
-    { position: [2.2, 1.05, -3.4], rotation: [-0.06, -0.04, 0.015], scale: 1.05, opacity: 0.7 },
-    { position: [0, 2.65, -5.8], rotation: [-0.08, 0, 0], scale: 0.78, opacity: 0.28 },
-    { position: [-3.45, -0.05, 0.45], rotation: [0, 0.15, -0.025], scale: 0.93, opacity: 1 },
-    { position: [1.55, 0.1, 1.2], rotation: [0, -0.055, 0.008], scale: 1.48, opacity: 1 },
-  ],
-  collect: [
-    { position: [1.15, -2.35, -4.1], rotation: [0.08, 0.16, -0.06], scale: 0.75, opacity: 0.08 },
-    { position: [-4.7, -1.9, -5.4], rotation: [0.05, 0.25, -0.06], scale: 0.72, opacity: 0.24 },
-    { position: [0, -0.05, 0.75], rotation: [0, 0, 0], scale: 1.03, opacity: 1 },
-    { position: [4.65, -1.6, -4.8], rotation: [0, -0.24, 0.055], scale: 0.76, opacity: 0.3 },
-  ],
-  grow: [
-    { position: [3.75, -2.05, -3.6], rotation: [0.08, -0.16, 0.055], scale: 0.75, opacity: 0.08 },
-    { position: [4.75, -1.95, -5.7], rotation: [0.04, -0.23, 0.05], scale: 0.72, opacity: 0.24 },
-    { position: [3.45, -0.05, 0.35], rotation: [0, -0.15, 0.025], scale: 0.93, opacity: 1 },
-    { position: [5.1, 1.75, -5.6], rotation: [0, -0.25, 0.04], scale: 0.75, opacity: 0.24 },
-  ],
-};
-
-function ArchiveCard({ definition, texture, sceneRef, index }: { definition: ArchiveCardDefinition; texture: THREE.Texture; sceneRef: MutableRefObject<number>; index: number }) {
-  const narrative = useRef<THREE.Group>(null);
-  const breathing = useRef<THREE.Group>(null);
-  const material = useRef<THREE.MeshBasicMaterial>(null);
-  const currentOpacity = useRef(POSES[definition.id][0].opacity);
-  const currentScale = useRef(POSES[definition.id][0].scale);
-
-  useFrame(({ clock }, delta) => {
-    const group = narrative.current;
-    const inner = breathing.current;
-    const shader = material.current;
-    if (!group || !inner || !shader) return;
-    const dt = Math.min(delta, 0.05);
-    const scene = Math.max(0, Math.min(3, Math.round(sceneRef.current)));
-    const target = POSES[definition.id][scene];
-    const lambda = 4.8;
-    group.position.x = THREE.MathUtils.damp(group.position.x, target.position[0], lambda, dt);
-    group.position.y = THREE.MathUtils.damp(group.position.y, target.position[1], lambda, dt);
-    group.position.z = THREE.MathUtils.damp(group.position.z, target.position[2], lambda, dt);
-    group.rotation.x = THREE.MathUtils.damp(group.rotation.x, target.rotation[0], lambda, dt);
-    group.rotation.y = THREE.MathUtils.damp(group.rotation.y, target.rotation[1], lambda, dt);
-    group.rotation.z = THREE.MathUtils.damp(group.rotation.z, target.rotation[2], lambda, dt);
-    currentScale.current = THREE.MathUtils.damp(currentScale.current, target.scale, lambda, dt);
-    currentOpacity.current = THREE.MathUtils.damp(currentOpacity.current, target.opacity, 6.5, dt);
-    group.scale.setScalar(currentScale.current);
-    shader.opacity = currentOpacity.current;
-    const time = clock.elapsedTime;
-    const phase = index * 1.73;
-    inner.position.x = Math.sin(time * 0.16 + phase) * 0.035;
-    inner.position.y = Math.sin(time * 0.12 + phase * 0.7) * 0.045;
-    inner.position.z = Math.sin(time * 0.1 + phase) * 0.028;
-    inner.rotation.y = Math.sin(time * 0.09 + phase) * 0.004;
-  });
-
-  const initial = POSES[definition.id][0];
-  return (
-    <group ref={narrative} position={initial.position} rotation={initial.rotation} scale={initial.scale}>
-      <group ref={breathing}>
-        <mesh>
-          <planeGeometry args={[definition.width, definition.height, 1, 1]} />
-          <meshBasicMaterial ref={material} map={texture} color="#ffffff" transparent opacity={initial.opacity} depthWrite={false} toneMapped={false} />
-        </mesh>
-      </group>
-    </group>
-  );
+function startingTier() {
+  const nav = navigator as Signals;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const memory = nav.deviceMemory ?? 8;
+  const cores = navigator.hardwareConcurrency ?? 8;
+  if (memory <= 4 || cores <= 4) return 4;
+  if (coarse) return memory <= 6 || cores <= 6 ? 3 : 2;
+  return cores >= 8 && memory >= 8 ? 0 : 1;
 }
 
-function DepthArchitecture({ sceneRef }: { sceneRef: MutableRefObject<number> }) {
-  const group = useRef<THREE.Group>(null);
-  const geometry = useMemo(() => {
-    const points: number[] = [];
-    for (let z = -16; z <= 2; z += 2) {
-      points.push(-14, -3.9, z, 14, -3.9, z);
-      points.push(-14, 3.9, z, 14, 3.9, z);
-    }
-    for (let x = -14; x <= 14; x += 2) points.push(x, -3.9, -16, x, -3.9, 2);
-    return new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
-  }, []);
-  useFrame(({ clock }, delta) => {
-    if (!group.current) return;
-    const scene = Math.max(0, Math.min(3, Math.round(sceneRef.current)));
-    group.current.position.z = THREE.MathUtils.damp(group.current.position.z, [-0.2, -0.65, -1.1, -1.6][scene], 3.2, Math.min(delta, 0.05));
-    group.current.position.x = Math.sin(clock.elapsedTime * 0.045) * 0.08;
-  });
-  return <group ref={group} rotation={[-0.035, 0, 0]}><lineSegments geometry={geometry}><lineBasicMaterial color="#78cce0" transparent opacity={0.085} depthWrite={false} /></lineSegments></group>;
+// Wide viewports read the horizon off to the right of the headline; narrow ones
+// lift it clear of the stacked type instead.
+function framing(width: number, height: number) {
+  if (height >= width) return { center: [0.10, 0.60] as const, guard: [0.10, 0.92] as const, incl: 0.22, scale: 1.02, exposure: 0.38 };
+  if (width < 1100) return { center: [0.56, 0.30] as const, guard: [0.62, 0.42] as const, incl: 0.17, scale: 0.7, exposure: 0.42 };
+  return { center: [0.78, 0.26] as const, guard: [0.68, 0.34] as const, incl: 0.15, scale: 0.62, exposure: 0.44 };
 }
 
-function CameraRig({ sceneRef }: { sceneRef: MutableRefObject<number> }) {
-  const { camera } = useThree();
-  useFrame(({ clock }, delta) => {
-    const scene = Math.max(0, Math.min(3, Math.round(sceneRef.current)));
-    const dt = Math.min(delta, 0.05);
-    camera.position.x = THREE.MathUtils.damp(camera.position.x, [0, 0, 0, -0.45][scene], 3.6, dt);
-    camera.position.y = THREE.MathUtils.damp(camera.position.y, [0, 0.05, 0, 0.04][scene], 3.6, dt);
-    camera.position.z = 9.3 + Math.sin(clock.elapsedTime * 0.08) * 0.055;
-    camera.rotation.z = Math.sin(clock.elapsedTime * 0.055) * 0.0015;
-  });
-  return null;
+function compile(gl: WebGL2RenderingContext, type: number, source: string) {
+  const shader = gl.createShader(type);
+  if (!shader) return null;
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    gl.deleteShader(shader);
+    return null;
+  }
+  return shader;
 }
 
-function FirstFrameReady({ failed, onFailure, onReady }: { failed: MutableRefObject<boolean>; onFailure: () => void; onReady: () => void }) {
-  const reported = useRef(false);
-  const frames = useRef(0);
-  const { gl } = useThree();
-  useFrame(() => {
-    if (reported.current || failed.current) return;
-    frames.current += 1;
-    if (frames.current < 60) return;
-    const context = gl.getContext();
-    const size = gl.getDrawingBufferSize(new THREE.Vector2());
-    const pixel = new Uint8Array(4);
-    let opaque = 0;
-    let nearWhite = 0;
-    for (const xRatio of [0.44, 0.58, 0.72, 0.86]) {
-      for (const yRatio of [0.22, 0.4, 0.58, 0.76]) {
-        context.readPixels(Math.floor(size.x * xRatio), Math.floor(size.y * yRatio), 1, 1, context.RGBA, context.UNSIGNED_BYTE, pixel);
-        if (pixel[3] < 12) continue;
-        opaque += 1;
-        if (pixel[0] > 220 && pixel[1] > 220 && pixel[2] > 220) nearWhite += 1;
-      }
-    }
-    // Some software rasterizers accept texture uploads but render every image
-    // plane white. Never promote that frame over the guaranteed archive poster.
-    if (opaque >= 4 && nearWhite / opaque > 0.55) {
-      failed.current = true;
-      onFailure();
+export default function HeroExperience({ active, className, onFailure, onReady }: HeroExperienceProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const activeRef = useRef(active);
+  const failureRef = useRef(onFailure);
+  const readyRef = useRef(onReady);
+
+  // Kept in refs so the render loop reads current values without ever tearing
+  // down and rebuilding the GL program.
+  useEffect(() => {
+    activeRef.current = active;
+    failureRef.current = onFailure;
+    readyRef.current = onReady;
+  }, [active, onFailure, onReady]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext("webgl2", {
+      alpha: false,
+      antialias: false,
+      depth: false,
+      failIfMajorPerformanceCaveat: true,
+      powerPreference: "high-performance",
+      stencil: false,
+    });
+    if (!gl) {
+      failureRef.current();
       return;
     }
-    reported.current = true;
-    onReady();
-  });
-  return null;
-}
 
-function ArchiveScene({ sceneRef, onFailure, onReady }: { sceneRef: MutableRefObject<number>; onFailure: () => void; onReady: () => void }) {
-  const textures = useLoader(THREE.TextureLoader, CARDS.map((card) => card.image));
-  const { gl } = useThree();
-  const failed = useRef(false);
-  useEffect(() => {
-    for (const texture of textures) {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
-      texture.needsUpdate = true;
-      gl.initTexture(texture);
+    const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SOURCE);
+    const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SOURCE);
+    const program = vertex && fragment ? gl.createProgram() : null;
+    if (!vertex || !fragment || !program) {
+      failureRef.current();
+      return;
     }
-  }, [gl, textures]);
-  useEffect(() => {
-    gl.debug.onShaderError = () => {
-      if (failed.current) return;
-      failed.current = true;
-      onFailure();
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    gl.deleteShader(vertex);
+    gl.deleteShader(fragment);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      gl.deleteProgram(program);
+      failureRef.current();
+      return;
+    }
+
+    // The triangle comes from gl_VertexID, so there is nothing to bind beyond
+    // an empty vertex array.
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    gl.useProgram(program);
+
+    const uniform = (name: string) => gl.getUniformLocation(program, name);
+    const uRes = uniform("uRes");
+    const uTime = uniform("uTime");
+    const uSteps = uniform("uSteps");
+    const uOctaves = uniform("uOctaves");
+    const uCenter = uniform("uCenter");
+    const uScale = uniform("uScale");
+    const uIncl = uniform("uIncl");
+    const uExposure = uniform("uExposure");
+    const uReveal = uniform("uReveal");
+    const uGuard = uniform("uGuard");
+
+    let tier = startingTier();
+    let disposed = false;
+    let frame = 0;
+    let announced = false;
+    let started = 0;
+    let slowRun = 0;
+    let fastRun = 0;
+    let lastStamp = 0;
+
+    const resize = () => {
+      const view = framing(canvas.clientWidth || 1, canvas.clientHeight || 1);
+      const quality = QUALITY_TIERS[tier];
+      const ratio = Math.min(window.devicePixelRatio || 1, quality.dpr);
+      const width = Math.max(1, Math.round((canvas.clientWidth || 1) * ratio));
+      const height = Math.max(1, Math.round((canvas.clientHeight || 1) * ratio));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      gl.viewport(0, 0, width, height);
+      gl.uniform2f(uRes, width, height);
+      gl.uniform2f(uCenter, view.center[0], view.center[1]);
+      gl.uniform1f(uScale, view.scale);
+      gl.uniform1f(uIncl, view.incl);
+      gl.uniform2f(uGuard, view.guard[0], view.guard[1]);
+      gl.uniform1f(uSteps, quality.steps);
+      gl.uniform1f(uOctaves, quality.octaves);
+      gl.uniform1f(uExposure, view.exposure);
     };
-    return () => { gl.debug.onShaderError = null; };
-  }, [gl, onFailure]);
-  return (
-    <>
-      <fog attach="fog" args={["#04060b", 16, 34]} />
-      <CameraRig sceneRef={sceneRef} />
-      <DepthArchitecture sceneRef={sceneRef} />
-      {CARDS.map((definition, index) => <ArchiveCard key={definition.id} definition={definition} texture={textures[index]} sceneRef={sceneRef} index={index} />)}
-      <FirstFrameReady failed={failed} onFailure={onFailure} onReady={onReady} />
-    </>
-  );
-}
 
-class HeroErrorBoundary extends Component<{ children: ReactNode; onFailure: () => void }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { this.props.onFailure(); }
-  render() { return this.state.failed ? null : this.props.children; }
-}
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
 
-export default function HeroExperience({ active, className, sceneRef, onFailure, onReady }: HeroExperienceProps) {
-  const failed = useRef(false);
-  const fail = useCallback(() => {
-    if (failed.current) return;
-    failed.current = true;
-    onFailure();
-  }, [onFailure]);
-  const ready = useCallback(() => { if (!failed.current) onReady?.(); }, [onReady]);
-  return (
-    <HeroErrorBoundary onFailure={fail}>
-      <Canvas
-        className={className ? `experience-canvas ${className}` : "experience-canvas"}
-        camera={{ fov: 42, near: 0.1, far: 40, position: [0, 0, 9.3] }}
-        dpr={[1, 1.5]}
-        frameloop={active ? "always" : "demand"}
-        gl={{ alpha: false, antialias: true, powerPreference: "high-performance" }}
-        onCreated={({ gl }) => { gl.outputColorSpace = THREE.SRGBColorSpace; gl.setClearColor(0x03050a, 1); }}
-      >
-        <ArchiveScene sceneRef={sceneRef} onFailure={fail} onReady={ready} />
-      </Canvas>
-    </HeroErrorBoundary>
-  );
+    const render = (stamp: number) => {
+      if (disposed) return;
+      frame = requestAnimationFrame(render);
+      if (!activeRef.current) {
+        lastStamp = 0;
+        return;
+      }
+      if (!started) started = stamp;
+      const elapsed = (stamp - started) / 1000;
+
+      // Frame-time governor: a sustained slow patch drops a tier and a long
+      // fast patch climbs back, so a weak GPU degrades instead of stuttering.
+      // The fast bound has to sit above a 60Hz vsync frame (16.7ms) or the
+      // climb-back can never fire on an ordinary display.
+      if (lastStamp) {
+        const cost = stamp - lastStamp;
+        if (cost > 24) {
+          slowRun += 1;
+          fastRun = 0;
+        } else if (cost < 18) {
+          fastRun += 1;
+          slowRun = 0;
+        }
+        if (slowRun > 40 && tier < QUALITY_TIERS.length - 1) {
+          tier += 1;
+          slowRun = 0;
+          resize();
+        } else if (fastRun > 240 && tier > 0) {
+          tier -= 1;
+          fastRun = 0;
+          resize();
+        }
+      }
+      lastStamp = stamp;
+
+      gl.uniform1f(uTime, elapsed);
+      gl.uniform1f(uReveal, Math.min(1, elapsed / 1.4));
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      if (!announced && elapsed > 0.05) {
+        announced = true;
+        readyRef.current?.();
+      }
+    };
+    frame = requestAnimationFrame(render);
+
+    const onLost = (event: Event) => {
+      event.preventDefault();
+      failureRef.current();
+    };
+    canvas.addEventListener("webglcontextlost", onLost);
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      canvas.removeEventListener("webglcontextlost", onLost);
+      gl.deleteProgram(program);
+      gl.deleteVertexArray(vao);
+      // Never force-lose the context here: getContext() hands the same object
+      // back to the next mount (StrictMode does exactly this), and a lost
+      // context fails every compile silently.
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className={className ? `hero-void ${className}` : "hero-void"} aria-hidden="true" />;
 }

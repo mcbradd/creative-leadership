@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode } from "react";
 import { LazyMotion, MotionConfig, m, useReducedMotion } from "motion/react";
+import { detectExperienceTier } from "./experience";
 import {
   capabilityInsights,
   caseStudies,
@@ -200,6 +201,7 @@ function Toast({ notice, onDismiss }: { notice: Notice | null; onDismiss: () => 
 
 function useHeroMotionGate() {
   const ref = useRef<HTMLElement | null>(null);
+  const [active, setActive] = useState(false);
 
   useEffect(() => {
     const hero = ref.current;
@@ -211,6 +213,7 @@ function useHeroMotionGate() {
     const sync = () => {
       const next = reduced.matches ? "reduced" : intersects && document.visibilityState === "visible" ? "active" : "paused";
       if (hero.dataset.motion !== next) hero.dataset.motion = next;
+      setActive(next === "active");
     };
 
     if ("IntersectionObserver" in window) {
@@ -228,13 +231,37 @@ function useHeroMotionGate() {
     };
   }, []);
 
-  return ref;
+  return { ref, active };
+}
+
+const HeroVoid = lazy(() => import("./hero/HeroExperience"));
+
+class HeroVoidBoundary extends Component<{ children: ReactNode; onFailure: () => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onFailure(); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
+// The lensed backdrop is an upgrade over the CSS teaser, never a dependency of
+// it: any probe failure, shader failure or lost context drops silently back.
+function useLensedBackdrop() {
+  const [tier] = useState(detectExperienceTier);
+  const [failed, setFailed] = useState(false);
+  const disable = useCallback(() => setFailed(true), []);
+  return { enabled: !failed && (tier === "webgl" || tier === "webgpu"), disable };
 }
 
 function HeroSection() {
-  const heroRef = useHeroMotionGate();
+  const { ref: heroRef, active } = useHeroMotionGate();
+  const { enabled, disable } = useLensedBackdrop();
   return (
-    <section ref={heroRef} className="hero" id="top" data-motion="idle" data-static="true" data-enhanced="true">
+    <section ref={heroRef} className="hero" id="top" data-motion="idle" data-static={enabled ? "false" : "true"} data-enhanced="true">
+      {enabled && (
+        <HeroVoidBoundary onFailure={disable}>
+          <Suspense fallback={null}><HeroVoid active={active} onFailure={disable} /></Suspense>
+        </HeroVoidBoundary>
+      )}
       <div className="hero-grid" aria-hidden="true" />
       <div className="hero-light-field" aria-hidden="true"><i /><i /></div>
       <div className="hero-orbit" aria-hidden="true"><span /><i /></div>
