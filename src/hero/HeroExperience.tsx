@@ -105,6 +105,18 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   float density = edge * (0.40 + 0.90 * turb) * (0.52 + 0.76 * strands);
   density *= pow(1.0 - t, 0.80);
 
+  // A body caught in the well and being pulled apart: a dense head on a
+  // Keplerian orbit, with the shredded stream trailing behind it and fanning
+  // out in radius as the tidal stretch takes hold.
+  float rk = 7.4;
+  float ak = -uTime * 1.45 * pow(rk, -1.5) * 0.75;
+  float da = mod(atan(hit.z, hit.x) - ak + 3.14159265, 6.28318531) - 3.14159265;
+  float dr = r - rk;
+  float head = exp(-da * da / 0.022 - dr * dr / 0.42);
+  float tail = smoothstep(0.0, 0.10, da) * exp(-da * 1.15) * exp(-dr * dr / (0.55 + da * 0.85));
+  float debris = head + tail * 0.42 * (0.45 + 0.85 * strands);
+  density = clamp(density + debris * edge * 0.62, 0.0, 1.55);
+
   // Relativistic beaming plus gravitational redshift.
   float speed = sqrt(RS / (2.0 * max(r, DISK_IN)));
   vec3 vel = normalize(cross(vec3(0.0, 1.0, 0.0), hit)) * speed;
@@ -118,6 +130,10 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   vec3 col = diskPalette(t);
   col = mix(col, vec3(0.24, 0.94, 1.00), clamp((shift - 1.0) * 0.5, 0.0, 0.5));
   col *= beam;
+
+  // The head runs hotter than the gas around it and drags a cyan-lit trail.
+  col += vec3(1.00, 0.72, 0.94) * head * 1.45;
+  col += vec3(0.42, 0.90, 1.00) * tail * 0.42;
 
   alpha = clamp(density * 1.15, 0.0, 1.0);
   return col * (0.9 + 1.6 * density);
