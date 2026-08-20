@@ -41,19 +41,19 @@ const POSES: Record<ArchiveCardId, readonly Pose[]> = {
     { position: [4.9, 1.4, -6], rotation: [0, -0.2, 0.04], scale: 0.72, opacity: 0.22 },
   ],
   play: [
-    { position: [2.05, 2.15, -2.8], rotation: [-0.08, -0.04, 0.015], scale: 1.15, opacity: 0.68 },
+    { position: [2.2, 1.05, -3.4], rotation: [-0.06, -0.04, 0.015], scale: 1.05, opacity: 0.7 },
     { position: [0, 2.65, -5.8], rotation: [-0.08, 0, 0], scale: 0.78, opacity: 0.28 },
     { position: [-3.45, -0.05, 0.45], rotation: [0, 0.15, -0.025], scale: 0.93, opacity: 1 },
     { position: [1.55, 0.1, 1.2], rotation: [0, -0.055, 0.008], scale: 1.48, opacity: 1 },
   ],
   collect: [
-    { position: [1.15, -2.35, -4.1], rotation: [0.08, 0.16, -0.06], scale: 0.75, opacity: 0.3 },
+    { position: [1.15, -2.35, -4.1], rotation: [0.08, 0.16, -0.06], scale: 0.75, opacity: 0.08 },
     { position: [-4.7, -1.9, -5.4], rotation: [0.05, 0.25, -0.06], scale: 0.72, opacity: 0.24 },
     { position: [0, -0.05, 0.75], rotation: [0, 0, 0], scale: 1.03, opacity: 1 },
     { position: [4.65, -1.6, -4.8], rotation: [0, -0.24, 0.055], scale: 0.76, opacity: 0.3 },
   ],
   grow: [
-    { position: [3.75, -2.05, -3.6], rotation: [0.08, -0.16, 0.055], scale: 0.75, opacity: 0.36 },
+    { position: [3.75, -2.05, -3.6], rotation: [0.08, -0.16, 0.055], scale: 0.75, opacity: 0.08 },
     { position: [4.75, -1.95, -5.7], rotation: [0.04, -0.23, 0.05], scale: 0.72, opacity: 0.24 },
     { position: [3.45, -0.05, 0.35], rotation: [0, -0.15, 0.025], scale: 0.93, opacity: 1 },
     { position: [5.1, 1.75, -5.6], rotation: [0, -0.25, 0.04], scale: 0.75, opacity: 0.24 },
@@ -226,8 +226,8 @@ export default function HeroExperience({ active, className, sceneRef, onFailure,
         camera={{ fov: 42, near: 0.1, far: 40, position: [0, 0, 9.3] }}
         dpr={[1, 1.5]}
         frameloop={active ? "always" : "demand"}
-        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-        onCreated={({ gl }) => { gl.outputColorSpace = THREE.SRGBColorSpace; gl.setClearColor(0x03050a, 0); }}
+        gl={{ alpha: false, antialias: true, powerPreference: "high-performance" }}
+        onCreated={({ gl }) => { gl.outputColorSpace = THREE.SRGBColorSpace; gl.setClearColor(0x03050a, 1); }}
       >
         <ArchiveScene sceneRef={sceneRef} onFailure={fail} onReady={ready} />
       </Canvas>
