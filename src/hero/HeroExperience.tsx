@@ -29,13 +29,13 @@ const CARDS: readonly ArchiveCardDefinition[] = [
 
 const POSES: Record<ArchiveCardId, readonly Pose[]> = {
   bradd: [
-    { position: [0.65, -0.85, -1.55], rotation: [-0.02, 0.16, -0.018], scale: 0.78, opacity: 0.72 },
+    { position: [0.65, -0.85, -1.55], rotation: [-0.02, 0.16, -0.018], scale: 0.78, opacity: 0.96 },
     { position: [0.7, -0.02, 0.15], rotation: [0, 0.08, -0.012], scale: 1.02, opacity: 1 },
     { position: [-5.2, 1.15, -5.2], rotation: [0, 0.28, -0.04], scale: 0.78, opacity: 0.32 },
     { position: [-4.8, -1.25, -5.8], rotation: [0, 0.2, -0.04], scale: 0.72, opacity: 0.22 },
   ],
   stone: [
-    { position: [3.35, -0.42, -0.95], rotation: [0.02, -0.18, 0.02], scale: 0.9, opacity: 0.88 },
+    { position: [3.35, -0.42, -0.95], rotation: [0.02, -0.18, 0.02], scale: 0.9, opacity: 1 },
     { position: [3.35, -0.02, 0.25], rotation: [0, -0.08, 0.012], scale: 1.06, opacity: 1 },
     { position: [5.2, 1.05, -5.4], rotation: [0, -0.28, 0.04], scale: 0.78, opacity: 0.32 },
     { position: [4.9, 1.4, -6], rotation: [0, -0.2, 0.04], scale: 0.72, opacity: 0.22 },
@@ -147,7 +147,7 @@ function FirstFrameReady({ failed, onFailure, onReady }: { failed: MutableRefObj
   useFrame(() => {
     if (reported.current || failed.current) return;
     frames.current += 1;
-    if (frames.current < 20) return;
+    if (frames.current < 60) return;
     const context = gl.getContext();
     const size = gl.getDrawingBufferSize(new THREE.Vector2());
     const pixel = new Uint8Array(4);
@@ -183,6 +183,7 @@ function ArchiveScene({ sceneRef, onFailure, onReady }: { sceneRef: MutableRefOb
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
       texture.needsUpdate = true;
+      gl.initTexture(texture);
     }
   }, [gl, textures]);
   useEffect(() => {
