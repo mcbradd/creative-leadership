@@ -81,7 +81,7 @@ export async function isHeroStatic(page) {
 }
 
 /** Resolves once the lazy WebGL hero has painted its first frame. */
-export async function waitForCinematic(page, timeout = 15000) {
+export async function waitForCinematic(page, timeout = 6000) {
   await page
     .waitForFunction(() => {
       const hero = document.querySelector(".hero");

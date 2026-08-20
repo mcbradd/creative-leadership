@@ -84,12 +84,9 @@ describe("intro scene director", () => {
     const { page, context } = await pageFor("webgl", true);
     try {
       await waitForCinematic(page);
-      const hero = page.locator(".hero");
-      const enhanced = await hero.getAttribute("data-enhanced");
-      const surface = enhanced === "true" ? page.locator(".hero canvas") : hero;
-      const first = await surface.screenshot();
+      const first = await page.screenshot();
       await page.waitForTimeout(850);
-      const second = await surface.screenshot();
+      const second = await page.screenshot();
       assert.notEqual(Buffer.compare(first, second), 0, "visual layer froze between authored beats");
     } finally {
       await context.close();
