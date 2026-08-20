@@ -78,7 +78,10 @@ h2 em.lava-flow { color: transparent; background-image: conic-gradient(from 108d
 .hero-shell { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: center; width: min(100%, 1440px); min-height: 100svh; margin-inline: auto; padding: calc(96px + env(safe-area-inset-top)) 20px 30px; }
 .hero .eyebrow { max-width: 38ch; margin: 0 0 26px; color: var(--cyan); }
 .hero h1 { position: relative; z-index: 2; max-width: 1120px; margin: 0; font-size: clamp(50px,15.5vw,72px); font-weight: 690; line-height: .92; letter-spacing: -.045em; }
-.hero h1 em { display: block; margin-bottom: -.1em; padding: .06em 0 .1em; color: transparent; background-image: radial-gradient(circle at 18% 48%,var(--paper) 0,var(--cyan) 24%,transparent 50%),radial-gradient(circle at 78% 52%,var(--violet) 0,var(--amber) 30%,transparent 56%),linear-gradient(100deg,var(--paper),var(--cyan) 38%,var(--violet) 72%,var(--amber)); background-size: 165% 175%,175% 165%,100% 100%; background-position: 0 44%,100% 56%,0 0; background-repeat: no-repeat; background-clip: text; -webkit-background-clip: text; font-family: var(--sans); font-style: normal; font-weight: 690; line-height: .96; letter-spacing: -.045em; }
+.hero h1 em { display: block; margin-bottom: -.1em; padding: .06em 0 .1em; color: var(--paper); font-family: var(--sans); font-style: normal; font-weight: 690; line-height: .96; letter-spacing: -.045em; }
+/* Enhanced tiers cut the payoff out of the page: the glyphs go transparent and
+   the hero canvas raytraces lava behind them. Solid paper is the fallback. */
+.hero[data-static="false"] h1 em { color: transparent; -webkit-text-fill-color: transparent; }
 .hero-footer { position: relative; z-index: 2; display: grid; gap: 22px; margin-top: 32px; }
 .hero-footer > p { max-width: 58ch; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .hero-enter { display: inline-flex; align-items: center; justify-content: space-between; gap: 28px; width: min(100%,280px); min-height: 52px; padding: 0 16px; border: 1px solid var(--cyan); background: rgba(114,228,255,.08); color: var(--paper); font-size: 8px; font-weight: 780; letter-spacing: .12em; text-transform: uppercase; }

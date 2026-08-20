@@ -30,6 +30,8 @@ uniform float uIncl;
 uniform float uExposure;
 uniform float uReveal;
 uniform vec2 uGuard;
+uniform sampler2D uMask;
+uniform vec4 uLavaRect;
 
 const float RS       = 1.0;
 const float DISK_IN  = 2.6;
@@ -216,6 +218,139 @@ vec3 trace(vec3 ro, vec3 rd) {
   return acc;
 }
 
+// --- Lava lamp read through the payoff glyphs -------------------------------
+// A lamp photographed in a blacked-out room: the bulb underneath is the only
+// light in the scene. Wax fills the tube, so glass is the exception, not the
+// backdrop.
+const int LAVA_N = 12;
+
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+// Convection, not a sine: wax heated at the base climbs quickly, stalls at the
+// top while it gives up heat, then sinks back down slower and heavier.
+vec4 blob(float i, float t) {
+  float speed = 0.050 + 0.020 * fract(i * 0.31);
+  float u = fract(t * speed + fract(i * 0.618) + i * 0.077);
+  float rise = smoothstep(0.0, 0.40, u);
+  float fall = smoothstep(0.54, 1.0, u);
+  float y = -1.12 + 2.24 * rise - 2.24 * fall;
+
+  // Crowding peaks mid-tube, where blobs shoulder past one another.
+  float squeeze = 1.0 - abs(y) * 0.82;
+  float baseX = (fract(i * 0.293) * 2.0 - 1.0) * 2.35;
+  float x = baseX + sin(t * 0.42 + i * 2.11) * (0.16 + 0.46 * squeeze);
+  float z = cos(t * 0.27 + i * 1.73) * 0.30;
+  float r = 0.56 + 0.26 * fract(i * 0.577);
+  return vec4(x, y, z, r);
+}
+
+// Each blob keeps its own dye. Nearest-centre wins, so two colours meeting at a
+// neck form a boundary instead of blending into mud.
+vec3 blobColor(float i) {
+  float h = fract(i * 0.437);
+  vec3 amber = vec3(1.00, 0.46, 0.10);
+  vec3 rose = vec3(1.00, 0.26, 0.42);
+  vec3 violet = vec3(0.60, 0.36, 1.00);
+  vec3 cyan = vec3(0.16, 0.82, 1.00);
+  vec3 c = amber;
+  c = h > 0.26 ? rose : c;
+  c = h > 0.50 ? violet : c;
+  c = h > 0.74 ? cyan : c;
+  return c;
+}
+
+float lavaField(vec3 p, float t) {
+  float d = 1e9;
+  for (int i = 0; i < LAVA_N; i++) {
+    vec4 b = blob(float(i), t);
+    d = smin(d, length(p - b.xyz) - b.w, 0.30);
+  }
+  return d;
+}
+
+vec3 lavaNearestColor(vec3 p, float t) {
+  float best = 1e9;
+  vec3 col = vec3(1.0);
+  for (int i = 0; i < LAVA_N; i++) {
+    vec4 b = blob(float(i), t);
+    float d = length(p - b.xyz) - b.w;
+    if (d < best) { best = d; col = blobColor(float(i)); }
+  }
+  return col;
+}
+
+vec3 lavaNormal(vec3 p, float t) {
+  vec2 e = vec2(0.0018, 0.0);
+  return normalize(vec3(
+    lavaField(p + e.xyy, t) - lavaField(p - e.xyy, t),
+    lavaField(p + e.yxy, t) - lavaField(p - e.yxy, t),
+    lavaField(p + e.yyx, t) - lavaField(p - e.yyx, t)
+  ));
+}
+
+// Only visible where wax fails to cover: the curved tube wall picking up the
+// bulb and bending it into a bright vertical rim.
+vec3 glassWall(vec2 q, vec3 rd, float bulbFall) {
+  float curve = clamp(q.x / 2.9, -1.0, 1.0);
+  vec3 n = normalize(vec3(curve * 0.95, 0.14, 0.72));
+  float fres = pow(1.0 - abs(dot(n, -rd)), 4.0);
+  vec3 col = vec3(0.006, 0.008, 0.014);
+  col += vec3(1.00, 0.52, 0.20) * bulbFall * 0.26;
+  col += vec3(0.52, 0.62, 0.78) * fres * 0.40;
+  float streak = pow(max(0.0, 1.0 - abs(curve * 2.4 - 0.55)), 9.0);
+  col += vec3(0.95, 0.86, 0.74) * streak * bulbFall * 0.55;
+  return col;
+}
+
+vec3 lavaScene(vec2 q, float t) {
+  vec3 ro = vec3(0.0, 0.0, 2.4);
+  vec3 rd = normalize(vec3(q, -1.9));
+  float bulbY = -1.62;
+  float bulbFall = 1.0 / (1.0 + (q.y - bulbY) * (q.y - bulbY) * 0.40);
+
+  float dist = 0.0;
+  bool hit = false;
+  vec3 p = ro;
+  for (int i = 0; i < 64; i++) {
+    p = ro + rd * dist;
+    float d = lavaField(p, t);
+    if (d < 0.0018) { hit = true; break; }
+    dist += d;
+    if (dist > 6.5) break;
+  }
+  if (!hit) return glassWall(q, rd, bulbFall);
+
+  vec3 n = lavaNormal(p, t);
+  vec3 bulb = vec3(p.x, bulbY, 0.30);
+  vec3 toLight = normalize(bulb - p);
+
+  float thickness = 0.0;
+  for (int i = 0; i < 7; i++) {
+    thickness += max(0.0, -lavaField(p + toLight * (0.05 + float(i) * 0.13), t));
+  }
+  // 0.13 is the march step, so this is an optical depth rather than a raw sum.
+  vec3 transmit = exp(-thickness * 0.13 * vec3(0.55, 1.25, 1.95));
+  float dist2 = dot(p - bulb, p - bulb);
+  float falloff = 1.0 / (1.0 + dist2 * 0.30);
+
+  float wrap = clamp(dot(n, toLight) * 0.5 + 0.5, 0.0, 1.0);
+  float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+  float spec = pow(max(dot(reflect(-toLight, n), -rd), 0.0), 54.0);
+
+  vec3 body = lavaNearestColor(p, t);
+  // Hot wax at the base still carries the bulb; cooled wax up top is dimmer.
+  float heat = mix(0.55, 1.35, smoothstep(1.05, -1.05, p.y));
+
+  vec3 col = body * transmit * falloff * (0.62 + 1.05 * wrap) * 3.1 * heat;
+  col += body * bulbFall * 0.30;
+  col += vec3(0.96, 0.94, 0.90) * spec * 0.85;
+  col += body * fres * 0.38;
+  return col;
+}
+
 vec3 tonemap(vec3 x) {
   const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
@@ -241,6 +376,17 @@ void main() {
   col *= mix(1.0, smoothstep(-0.72, 0.42, vNdc.y), uGuard.y);
   col *= uExposure * uReveal;
   col = tonemap(col);
+
+  // The payoff line is a cutout: the glyph mask swaps the backdrop for the wax.
+  if (uLavaRect.z > 0.5) {
+    vec2 muv = gl_FragCoord.xy / uRes;
+    float m = texture(uMask, vec2(muv.x, 1.0 - muv.y)).r;
+    if (m > 0.002) {
+      vec2 q = (gl_FragCoord.xy - uLavaRect.xy) / uLavaRect.zw * 2.0 - 1.0;
+          q.x *= 2.7;
+      col = mix(col, tonemap(lavaScene(q, uTime) * 1.45 * uReveal), m);
+    }
+  }
   col += (hash21(gl_FragCoord.xy * 0.7 + uTime) - 0.5) * 0.005;
 
   fragColor = vec4(max(col, vec3(0.0)), 1.0);
@@ -363,6 +509,8 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     const uExposure = uniform("uExposure");
     const uReveal = uniform("uReveal");
     const uGuard = uniform("uGuard");
+    const uMask = uniform("uMask");
+    const uLavaRect = uniform("uLavaRect");
 
     let tier = startingTier();
     let disposed = false;
@@ -372,6 +520,67 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     let slowRun = 0;
     let fastRun = 0;
     let lastStamp = 0;
+
+    // The glyph mask is rasterised from the live layout rather than remeasured
+    // by hand: one rect per character means wrapped lines land exactly right.
+    const maskCanvas = document.createElement("canvas");
+    const maskTexture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    const buildMask = () => {
+      const target = canvas.parentElement?.querySelector<HTMLElement>(".hero-payoff");
+      const node = target?.firstChild;
+      const ctx = maskCanvas.getContext("2d");
+      if (!target || !ctx || !node || node.nodeType !== Node.TEXT_NODE) {
+        gl.uniform4f(uLavaRect, 0, 0, 0, 0);
+        return;
+      }
+      const canvasRect = canvas.getBoundingClientRect();
+      if (canvasRect.width < 1 || canvasRect.height < 1) return;
+      const scaleX = canvas.width / canvasRect.width;
+      const scaleY = canvas.height / canvasRect.height;
+
+      maskCanvas.width = canvas.width;
+      maskCanvas.height = canvas.height;
+      ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+      const styles = getComputedStyle(target);
+      ctx.font = `${styles.fontStyle} ${styles.fontWeight} ${parseFloat(styles.fontSize)}px ${styles.fontFamily}`;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#fff";
+
+      const text = node.textContent ?? "";
+      const range = document.createRange();
+      for (let i = 0; i < text.length; i += 1) {
+        if (text[i] === " ") continue;
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        const glyph = range.getBoundingClientRect();
+        if (glyph.width < 0.5) continue;
+        ctx.save();
+        ctx.translate((glyph.left + glyph.width / 2 - canvasRect.left) * scaleX, (glyph.top + glyph.height / 2 - canvasRect.top) * scaleY);
+        ctx.scale(scaleX, scaleY);
+        ctx.fillText(text[i], 0, 0);
+        ctx.restore();
+      }
+
+      gl.bindTexture(gl.TEXTURE_2D, maskTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+
+      const box = target.getBoundingClientRect();
+      const width = box.width * scaleX;
+      const height = box.height * scaleY;
+      const left = (box.left - canvasRect.left) * scaleX;
+      // gl_FragCoord counts from the bottom, the DOM box from the top.
+      const bottom = canvas.height - (box.top - canvasRect.top) * scaleY - height;
+      gl.uniform4f(uLavaRect, left, bottom, width, height);
+    };
 
     const resize = () => {
       const view = framing(canvas.clientWidth || 1, canvas.clientHeight || 1);
@@ -392,9 +601,13 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       gl.uniform1f(uSteps, quality.steps);
       gl.uniform1f(uOctaves, quality.octaves);
       gl.uniform1f(uExposure, view.exposure);
+      gl.uniform1i(uMask, 0);
+      buildMask();
     };
 
     resize();
+    // Mona Sans swapping in re-lays out the payoff, so the mask must follow it.
+    document.fonts?.ready.then(() => { if (!disposed) buildMask(); }).catch(() => {});
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
 
@@ -457,6 +670,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       canvas.removeEventListener("webglcontextlost", onLost);
       gl.deleteProgram(program);
       gl.deleteVertexArray(vao);
+      gl.deleteTexture(maskTexture);
       // Never force-lose the context here: getContext() hands the same object
       // back to the next mount (StrictMode does exactly this), and a lost
       // context fails every compile silently.

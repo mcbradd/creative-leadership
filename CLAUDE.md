@@ -33,7 +33,9 @@ npm run review           # Claude Opus 5 art-direction critique of outputs/shots
 
 `outputs/` is gitignored — baselines are a local iteration aid, not CI. `SITE_URL=https://… ` points any of these at a deployed build instead of booting Vite.
 
-`npm run review` needs `ANTHROPIC_API_KEY`. It also inherits `ANTHROPIC_BASE_URL` if set (this repo's `.claude/settings.local.json` sets one for Claude Code itself, which is a different process).
+`npm run review` needs `ANTHROPIC_API_KEY`.
+
+`npm run verify:hero` drives a **GPU-backed** Chromium against the real hero and fails if the canvas is missing, blank or under 24fps. The shared capture harness forces SwiftShader for `fx=webgl`, which the renderer refuses on purpose, so this is the only check that proves the backdrop draws. Manual only — stock CI runners have no GPU. It also inherits `ANTHROPIC_BASE_URL` if set (this repo's `.claude/settings.local.json` sets one for Claude Code itself, which is a different process).
 
 Desktop automation for anything outside the browser: `powershell -File scripts/desktop.ps1 <screenshot|windows|focus|click|type|keys|scroll|cursor>` (Windows-only, .NET, no dependencies).
 
@@ -42,12 +44,16 @@ Desktop automation for anything outside the browser: `powershell -File scripts/d
 - `src/App.tsx` — the whole page. Section components + `HeroSection` + `DetailDialog` (native `<dialog>` modal driven by a `Detail` union of `CaseStudy | Insight`). Media paths go through `media()`, which honors `import.meta.env.BASE_URL` — never hardcode `/media/...` or production breaks under the `/creative-leadership/` base.
 - `src/content.ts` — all copy and data (case studies, insights, partners, timeline). Text edits belong here, not in JSX, unless the string is structural.
 - `src/experience.ts` — `detectExperienceTier()` returns `static | motion | webgl | webgpu` from reduced-motion, `saveData`, `deviceMemory`/`hardwareConcurrency`, and a WebGL2 probe. Override in dev with `?fx=static|motion|webgl|webgpu`.
-- `src/hero/HeroExperience.tsx` — react-three-fiber cinematic, lazy-loaded and only mounted for the `webgl`/`webgpu` tiers. Inline GLSL shaders (particles / backdrop / remnant) driven by a single `progress` scalar; `frameloop="demand"`.
+- `src/hero/HeroExperience.tsx` — the hero backdrop, lazy-loaded and only mounted for the `webgl`/`webgpu` tiers. Dependency-free raw WebGL2 (no three.js, no react-three-fiber): a fullscreen triangle from `gl_VertexID` and one fragment shader that raytraces Schwarzschild photon geodesics (RK4 over the Binet equation) for real gravitational lensing, plus Doppler beaming, gravitational redshift and Keplerian shear on the accretion disk.
+  - The payoff line is a **cutout**: a glyph alpha mask is rasterised from per-character `Range` rects of `.hero-payoff` (so wrapped lines land exactly), uploaded as a texture, and the shader raymarches lava-lamp metaballs lit from a strip below wherever the mask is set. `.hero[data-static="false"] h1 em` goes transparent so the wax reads through the type; solid `--paper` is the fallback.
+  - `QUALITY_TIERS` + a frame-time governor drop and restore steps/octaves/DPR. The climb-back bound must stay **above** a 60Hz vsync frame (16.7ms) or it can never fire on an ordinary display.
+  - Never call `loseContext()` on unmount: `getContext()` returns the same object to the next mount, and StrictMode's remount then gets a dead context where every compile fails with a *null* info log.
+  - Any failure (context, compile, link, lost context) calls `onFailure`, and `HeroVoidBoundary` in `App.tsx` drops silently back to the CSS hero.
 - `src/styles.css` — hand-written CSS, no framework. Tokens in `:root`, hero state driven off `data-phase` / `data-enhanced` / `data-static` attributes and the `--hero-progress` custom property.
 
 ### Hero progression (the fragile part)
 
-Scroll progress is computed in `HeroSection` from `heroRef.getBoundingClientRect()` — the element's own position, never `window.scrollY`. This is deliberate: deriving copy visibility from a restored scroll offset made hero text invisible on back-navigation, and `tests/site.test.mjs` asserts the broken patterns stay absent. `progress` flows to both CSS (`--hero-progress`) and the shader uniforms; keep them fed from the same value.
+Scroll progress is computed in `HeroSection` from `heroRef.getBoundingClientRect()` — the element's own position, never `window.scrollY`. This is deliberate: deriving copy visibility from a restored scroll offset made hero text invisible on back-navigation, and `tests/site.test.mjs` asserts the broken patterns stay absent. `progress` flows to CSS (`--hero-progress`); the backdrop shader animates entirely off its own `uTime`, deliberately, because `tests/hero-interaction.test.mjs` pins the hero's running animation-name set to exactly `hero-orbit-settle`, `hero-payoff-flow`, `hero-trace-x`, `hero-trace-y` — adding a CSS animation in the hero breaks that contract.
 
 Every cinematic path has to degrade: `HeroLazyBoundary` (chunk load failure) and `HeroErrorBoundary` + `gl.debug.onShaderError` (GPU/shader failure) both fall back to the static poster hero. Don't remove a fallback to simplify a change.
 

@@ -18,7 +18,8 @@
     "shots:cinematic": "node scripts/shots.mjs --fx=webgl --live --viewport=desktop --out=outputs/cinematic",
     "shots:baseline": "node scripts/shots.mjs --out=outputs/baseline",
     "visual-diff": "node scripts/visual-diff.mjs",
-    "review": "node scripts/design-review.mjs"
+    "review": "node scripts/design-review.mjs",
+    "verify:hero": "node scripts/verify-hero.mjs"
   },
   "dependencies": {
     "@fontsource-variable/mona-sans": "^5.3.0",
