@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { LazyMotion, m, useReducedMotion } from "motion/react";
 import {
   capabilityInsights,
@@ -12,7 +12,6 @@ import {
   type Insight,
 } from "./content";
 import { detectExperienceTier, type ExperienceTier } from "./experience";
-import { CHAPTERS, NARRATIVE_LAMBDA, chapterWeights, damp, phaseAt, type ChapterId } from "./hero/director";
 
 const HeroExperience = lazy(() => import("./hero/HeroExperience"));
 const loadMotionFeatures = () => import("./motionFeatures").then((module) => module.default);
@@ -180,102 +179,110 @@ function DetailDialog({ detail, onDismiss }: { detail: Detail | null; onDismiss:
   );
 }
 
-type HeroTarget = { x: number; y: number; size: number };
-
-const CHAPTER_IDS = CHAPTERS.map((chapter) => chapter.id);
+const HERO_SCENES = ["proposition", "partnership", "translation", "proof"] as const;
 
 function HeroSection({ tier }: { tier: ExperienceTier }) {
   const heroRef = useRef<HTMLElement>(null);
-  const targetRef = useRef<HTMLSpanElement>(null);
-  const payoffHeadingRef = useRef<HTMLHeadingElement>(null);
   const reduceMotion = useReducedMotion();
-  /** Raw scroll-derived value. Shared with the WebGL layer, which damps its own copy. */
-  const scrollTarget = useRef(0);
-  /** The damped value the DOM actually renders. */
-  const narrative = useRef(0);
-  const [phase, setPhase] = useState<ChapterId>("poster");
-  const [target, setTarget] = useState<HeroTarget | null>(null);
+  const sceneRef = useRef(0);
+  const [scene, setScene] = useState(0);
+  const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 620px)").matches);
   const [cinematicReady, setCinematicReady] = useState(false);
   const [cinematicFailed, setCinematicFailed] = useState(false);
   const [onScreen, setOnScreen] = useState(true);
-  const canRender = !reduceMotion && (tier === "webgl" || tier === "webgpu") && !cinematicFailed;
-  const activePhase: ChapterId = canRender ? phase : "payoff";
+  const canRender = !compact && !reduceMotion && (tier === "webgl" || tier === "webgpu") && !cinematicFailed;
 
-  const measureTarget = useCallback(() => {
-    const element = targetRef.current;
-    if (!element) return;
-    const rect = element.getBoundingClientRect();
-    const viewportScale = Math.max(1, Math.min(window.innerWidth, window.innerHeight));
-    const next = {
-      x: (rect.left + rect.width / 2) / window.innerWidth,
-      y: (rect.top + rect.height / 2) / window.innerHeight,
-      size: Math.max(rect.width, rect.height) / viewportScale,
-    };
-    setTarget((current) => current && Math.abs(current.x - next.x) < 0.001 && Math.abs(current.y - next.y) < 0.001 && Math.abs(current.size - next.size) < 0.001 ? current : next);
+  const goToScene = useCallback((next: number) => {
+    const clamped = Math.max(0, Math.min(HERO_SCENES.length - 1, next));
+    sceneRef.current = clamped;
+    setScene(clamped);
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 620px)");
+    const sync = () => setCompact(query.matches);
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
     const hero = heroRef.current;
     if (!hero) return;
-    let animationFrame = 0;
-    let lastTimestamp = 0;
-    let lastPhase: ChapterId = phaseAt(0);
-    const lambda = reduceMotion ? Number.POSITIVE_INFINITY : NARRATIVE_LAMBDA;
+    let wheelTotal = 0;
+    let lastStep = 0;
+    let touchStart = 0;
 
-    // Never derived from window.scrollY: back-navigation restores the offset before
-    // layout settles, which used to snap the hero to the wrong chapter.
-    const readScroll = () => {
+    const heroOwnsViewport = () => {
       const rect = hero.getBoundingClientRect();
-      const travel = Math.max(1, rect.height - window.innerHeight);
-      scrollTarget.current = Math.max(0, Math.min(1, -rect.top / travel));
+      const visible = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+      return visible / Math.min(rect.height, window.innerHeight) > 0.82;
     };
 
-    // Written as custom properties rather than React state: this runs every frame,
-    // and the phase attribute is the only part that changes rarely enough to render.
-    const write = (value: number) => {
-      hero.style.setProperty("--hero-progress", value.toFixed(4));
-      const weights = chapterWeights(value);
-      for (const id of CHAPTER_IDS) hero.style.setProperty(`--w-${id}`, weights[id].toFixed(4));
-      const next = phaseAt(value);
-      if (next !== lastPhase) {
-        lastPhase = next;
-        setPhase(next);
+    const step = (direction: -1 | 1) => {
+      const current = sceneRef.current;
+      if (direction > 0 && current === HERO_SCENES.length - 1) {
+        document.getElementById("team")?.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "start" });
+        return;
+      }
+      if (direction < 0 && current === 0) return;
+      goToScene(current + direction);
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!heroOwnsViewport() || event.ctrlKey) return;
+      const direction = Math.sign(event.deltaY) as -1 | 0 | 1;
+      const atBoundary = (direction < 0 && sceneRef.current === 0) || (direction > 0 && sceneRef.current === HERO_SCENES.length - 1);
+      if (atBoundary) {
+        if (direction > 0) {
+          event.preventDefault();
+          step(1);
+        }
+        return;
+      }
+      event.preventDefault();
+      if (Math.sign(wheelTotal) !== direction) wheelTotal = 0;
+      wheelTotal += event.deltaY;
+      const now = performance.now();
+      if (Math.abs(wheelTotal) >= 28 && now - lastStep > 260) {
+        lastStep = now;
+        wheelTotal = 0;
+        step(direction < 0 ? -1 : 1);
       }
     };
 
-    const tick = (timestamp: number) => {
-      const dt = lastTimestamp ? Math.min(0.05, (timestamp - lastTimestamp) / 1000) : 1 / 60;
-      lastTimestamp = timestamp;
-      readScroll();
-      narrative.current = damp(narrative.current, scrollTarget.current, lambda, dt);
-      write(narrative.current);
-      measureTarget();
-      // The loop idles once the copy has caught up, so a still page costs nothing.
-      const settled = Math.abs(narrative.current - scrollTarget.current) < 0.0002;
-      animationFrame = settled ? 0 : requestAnimationFrame(tick);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!heroOwnsViewport() || event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("button, a, input, textarea, select, dialog")) return;
+      const forward = event.key === "ArrowDown" || event.key === "ArrowRight" || event.key === "PageDown" || (event.key === " " && !event.shiftKey);
+      const backward = event.key === "ArrowUp" || event.key === "ArrowLeft" || event.key === "PageUp" || (event.key === " " && event.shiftKey);
+      if (event.key === "Home") { event.preventDefault(); goToScene(0); return; }
+      if (event.key === "End") { event.preventDefault(); goToScene(HERO_SCENES.length - 1); return; }
+      if (forward || backward) {
+        event.preventDefault();
+        step(forward ? 1 : -1);
+      }
     };
 
-    const wake = () => {
-      if (animationFrame) return;
-      lastTimestamp = 0;
-      animationFrame = requestAnimationFrame(tick);
+    const onTouchStart = (event: TouchEvent) => { touchStart = event.touches[0]?.clientY ?? 0; };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (!heroOwnsViewport()) return;
+      const end = event.changedTouches[0]?.clientY ?? touchStart;
+      const distance = touchStart - end;
+      if (Math.abs(distance) > 36) step(distance > 0 ? 1 : -1);
     };
 
-    readScroll();
-    narrative.current = scrollTarget.current;
-    write(narrative.current);
-    measureTarget();
-
-    window.addEventListener("scroll", wake, { passive: true });
-    window.addEventListener("resize", wake);
-    window.addEventListener("pageshow", wake);
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKeyDown);
+    hero.addEventListener("touchstart", onTouchStart, { passive: true });
+    hero.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
-      window.removeEventListener("scroll", wake);
-      window.removeEventListener("resize", wake);
-      window.removeEventListener("pageshow", wake);
-      cancelAnimationFrame(animationFrame);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
+      hero.removeEventListener("touchstart", onTouchStart);
+      hero.removeEventListener("touchend", onTouchEnd);
     };
-  }, [measureTarget, reduceMotion]);
+  }, [goToScene, reduceMotion]);
 
   useEffect(() => {
     const hero = heroRef.current;
@@ -285,83 +292,61 @@ function HeroSection({ tier }: { tier: ExperienceTier }) {
     return () => observer.disconnect();
   }, []);
 
-  const skipCinematic = () => {
-    const hero = heroRef.current;
-    if (!hero) return;
-    const rect = hero.getBoundingClientRect();
-    const heroTop = window.scrollY + rect.top;
-    const travel = Math.max(0, hero.offsetHeight - window.innerHeight);
-    window.scrollTo({ top: heroTop + travel * 0.99, behavior: "instant" });
-    requestAnimationFrame(() => requestAnimationFrame(() => payoffHeadingRef.current?.focus({ preventScroll: true })));
-  };
+  const continueFromHero = () => document.getElementById("team")?.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "start" });
 
   return (
-    <section
-      className="hero"
-      id="top"
-      ref={heroRef}
-      data-phase={activePhase}
-      data-enhanced={cinematicReady}
-      data-static={!canRender}
-    >
+    <section className="hero" id="top" ref={heroRef} data-scene={HERO_SCENES[scene]} data-scene-index={scene} data-enhanced={cinematicReady} data-static={!canRender}>
       <div className="hero-stage">
-        <div className="hero-orbit-static" aria-hidden="true"><span /><i /></div>
+        <div className="archive-atmosphere" aria-hidden="true" />
+        <div className="archive-poster" aria-hidden="true">
+          <figure className="archive-poster-play"><img src={media("tetris-beat-gameplay.webp")} alt="" width="1280" height="720" /></figure>
+          <figure className="archive-poster-collect"><img src={media("stone-raid-hires.webp")} alt="" width="1280" height="720" /></figure>
+          <figure className="archive-poster-grow"><img src={media("stone-chaotic-hires.webp")} alt="" width="1280" height="720" /></figure>
+          <figure className="archive-poster-bradd"><img src={media("bradd-portrait.webp")} alt="" width="1122" height="1402" /></figure>
+          <figure className="archive-poster-stone"><img src={media("stone-portrait.webp")} alt="" width="1122" height="1402" /></figure>
+        </div>
         {canRender && (
           <div className="hero-cinematic" aria-hidden="true">
-            <HeroLazyBoundary
-              onFailure={() => {
-                setCinematicReady(false);
-                setCinematicFailed(true);
-              }}
-            >
+            <HeroLazyBoundary onFailure={() => { setCinematicReady(false); setCinematicFailed(true); }}>
               <Suspense fallback={null}>
-                <HeroExperience
-                  active={onScreen}
-                  progressRef={scrollTarget}
-                  target={target}
-                  onReady={() => setCinematicReady(true)}
-                  onFailure={() => {
-                    setCinematicReady(false);
-                    setCinematicFailed(true);
-                  }}
-                />
+                <HeroExperience active={onScreen} sceneRef={sceneRef} onReady={() => setCinematicReady(true)} onFailure={() => { setCinematicReady(false); setCinematicFailed(true); }} />
               </Suspense>
             </HeroLazyBoundary>
           </div>
         )}
 
-        <p className="hero-identity">BRADD + STONE <span>／</span> CREATIVE LEADERSHIP</p>
-        <p className="sr-only">Bradd McBrearty and Stone Perales unite creative direction and art direction around one center of gravity. Together, they turn potential into coherent worlds designed to play, collect, and grow.</p>
+        <div className="hero-identity"><b>BRADD + STONE</b><span>CREATIVE LEADERSHIP</span></div>
+        <p className="hero-running-promise">WE TURN IP INTO WORLDS PEOPLE CAN <em>PLAY, COLLECT, AND GROW.</em></p>
 
-        <div className="hero-copy hero-poster" aria-hidden="true">
-          <p className="eyebrow">Creative leadership for games, brands &amp; entertainment</p>
-          <p className="hero-poster-name">BRADD <span>+</span> STONE</p>
-          <p className="hero-poster-thesis">Two disciplines. One center of gravity.</p>
-        </div>
-
-        <div className="hero-chapter hero-gravity" aria-hidden="true">
-          <span>01 / GRAVITY</span><p>Two disciplines.<br /><em>One field.</em></p>
-        </div>
-        <div className="hero-chapter hero-swelling" aria-hidden="true">
-          <span>02 / CREATIVE PRESSURE</span><p>Direction turns<br />potential into <em>energy.</em></p>
-        </div>
-        <div className="hero-chapter hero-field" aria-hidden="true">
-          <span>03 / THE POSSIBILITY FIELD</span><p>One idea.<br /><em>Every surface.</em></p>
-          <small>PLAY <i /> COLLECT <i /> GROW</small>
-        </div>
-        <div className="hero-chapter hero-remnant" aria-hidden="true">
-          <span>04 / THE CENTER</span><p>A world becomes real<br />when everything <em>belongs.</em></p>
-        </div>
-
-        <div className="hero-copy hero-payoff">
-          <p className="hero-payoff-lead" aria-hidden="true">WE TURN IP INTO</p>
-          <h1 ref={payoffHeadingRef} tabIndex={-1} aria-label="We turn IP into worlds people can play, collect, and grow.">W<span ref={targetRef} className="remnant-o">O</span>RLDS</h1>
-          <p className="hero-payoff-tail" aria-hidden="true">PEOPLE CAN <em>PLAY, COLLECT, AND GROW.</em></p>
-          <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="text-link" href="#team" tabIndex={phase === "payoff" ? undefined : -1}>Meet the partnership <span aria-hidden="true">↘</span></a></div>
+        <div className="hero-scene-stack" aria-live="polite">
+          <article className="hero-scene hero-scene-proposition" aria-hidden={scene !== 0}>
+            <p className="eyebrow">Creative leadership for games, brands &amp; entertainment</p>
+            <h1>BRADD <i>+</i> STONE</h1>
+            <p>One accountable team from first idea to market-ready experience.</p>
+          </article>
+          <article className="hero-scene hero-scene-partnership" aria-hidden={scene !== 1}>
+            <p className="eyebrow">01 / THE PARTNERSHIP</p>
+            <h2>Two leaders.<br /><em>One creative system.</em></h2>
+            <p>Stone establishes the visual truth. Bradd builds the product and production path that carries it into play.</p>
+          </article>
+          <article className="hero-scene hero-scene-translation" aria-hidden={scene !== 2}>
+            <p className="eyebrow">02 / THE VALUE</p>
+            <h2>One idea.<br /><em>Every surface.</em></h2>
+            <div className="hero-value-rail"><span><b>PLAY</b> Make the fantasy playable.</span><span><b>COLLECT</b> Make the world desirable in the hand.</span><span><b>GROW</b> Build rules that survive every format.</span></div>
+          </article>
+          <article className="hero-scene hero-scene-proof" aria-hidden={scene !== 3}>
+            <p className="eyebrow">03 / PROVEN TOGETHER</p>
+            <h2>Built to align.<br /><em>Built to ship.</em></h2>
+            <p>Tetris Beat is the proof: complementary direction turned fragmented work into one scalable, released experience.</p>
+            <button type="button" className="hero-primary-action" onClick={continueFromHero}>Meet the partnership <span aria-hidden="true">↘</span></button>
+          </article>
         </div>
 
-        <div className="hero-scroll-cue" aria-hidden="true"><span>{activePhase === "payoff" ? "CONTINUE" : "SCROLL TO BUILD THE WORLD"}</span><i /></div>
-        {canRender && activePhase !== "payoff" && <button className="hero-skip" type="button" onClick={skipCinematic}>Skip cinematic <span aria-hidden="true">↘</span></button>}
+        <nav className="hero-scene-nav" aria-label="Intro chapters">
+          {HERO_SCENES.map((id, index) => <button key={id} type="button" aria-label={`Show intro chapter ${index + 1}: ${id}`} aria-current={scene === index ? "step" : undefined} onClick={() => goToScene(index)}><span>{String(index + 1).padStart(2, "0")}</span><i /></button>)}
+        </nav>
+        <button className="hero-skip" type="button" onClick={continueFromHero}>Skip intro <span aria-hidden="true">↘</span></button>
+        <div className="hero-input-cue" aria-hidden="true"><span>{scene === HERO_SCENES.length - 1 ? "SCROLL TO CONTINUE" : "SCROLL · SWIPE · KEYS"}</span><i /></div>
       </div>
     </section>
   );

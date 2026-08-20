@@ -13,7 +13,7 @@ test("publishes a private-by-convention executive artifact", async () => {
 
   assert.match(html, /noindex, nofollow, noarchive/);
   assert.match(html, /Bradd \+ Stone — Creative Leadership/);
-  assert.match(app, /We turn IP into worlds people can/);
+  assert.match(app, /WE TURN IP INTO WORLDS PEOPLE CAN/);
   assert.match(app, /Not two résumés\. One shipped result\./);
   assert.match(app, /We build people who build worlds\./);
   assert.match(content, /Two successful funding rounds/);
@@ -49,7 +49,7 @@ test("makes every visual affordance actionable and uses upgraded proof imagery",
     readFile(new URL("src/styles.css", root), "utf8"),
   ]);
 
-  assert.match(app, /href="#team"/);
+  assert.match(app, /onClick=\{continueFromHero\}/);
   assert.match(app, /role="tablist"/);
   assert.match(app, /role="tabpanel"/);
   assert.match(app, /onClick=\{\(\) => openInsight\(insight\)\}/);
@@ -62,7 +62,7 @@ test("makes every visual affordance actionable and uses upgraded proof imagery",
   assert.match(css, /\.social-button \{/);
 });
 
-test("ships a progressively enhanced single-canvas experience", async () => {
+test("ships a progressively enhanced, continuously alive archive experience", async () => {
   const [app, experience, canvas] = await Promise.all([
     readFile(new URL("src/App.tsx", root), "utf8"),
     readFile(new URL("src/experience.ts", root), "utf8"),
@@ -75,13 +75,21 @@ test("ships a progressively enhanced single-canvas experience", async () => {
   assert.match(experience, /requestedCinematic/);
   assert.match(canvas, /frameloop=\{active \? "always" : "demand"\}/);
   assert.match(canvas, /powerPreference: "high-performance"/);
-  assert.match(canvas, /progress/);
-  assert.match(canvas, /target/);
-  assert.match(canvas, /fragmentShader/);
+  assert.match(canvas, /sceneRef: MutableRefObject<number>/);
+  assert.match(canvas, /useFrame\(\(\{ clock \}, delta\)/);
+  assert.match(canvas, /THREE\.MathUtils\.damp/);
+  assert.match(canvas, /bradd-portrait\.webp/);
+  assert.match(canvas, /stone-portrait\.webp/);
+  assert.match(canvas, /tetris-beat-gameplay\.webp/);
+  assert.match(canvas, /stone-raid-hires\.webp/);
+  assert.match(canvas, /stone-chaotic-hires\.webp/);
+  assert.match(canvas, /<DepthArchitecture/);
   assert.doesNotMatch(canvas, /ParticleResolve|WorldSeed/);
+  assert.doesNotMatch(canvas, /particle|starfield|black hole/i);
   assert.match(app, /class HeroLazyBoundary/);
   assert.match(canvas, /gl\.debug\.onShaderError/);
   assert.match(canvas, /<FirstFrameReady/);
+  assert.match(canvas, /nearWhite \/ opaque > 0\.55/);
   assert.doesNotMatch(canvas, /gl\.compile\(scene, camera\)/);
 });
 
@@ -92,7 +100,7 @@ test("keeps representation balanced in the featured case sequence", async () => 
   assert.deepEqual(owners.slice(0, 6), ["Bradd", "Stone", "Bradd", "Stone", "Bradd", "Stone"]);
 });
 
-test("never derives hero-copy visibility from a restored scroll offset", async () => {
+test("never binds hero visibility or animation time directly to scroll position", async () => {
   const [app, css] = await Promise.all([
     readFile(new URL("src/App.tsx", root), "utf8"),
     readFile(new URL("src/styles.css", root), "utf8"),
@@ -100,63 +108,42 @@ test("never derives hero-copy visibility from a restored scroll offset", async (
 
   assert.doesNotMatch(app, /window\.scrollY\s*\/\s*transitionDistance/);
   assert.doesNotMatch(app, /setHeroProgress/);
+  assert.doesNotMatch(app, /scrollTarget|progressRef|--hero-progress/);
   assert.doesNotMatch(css, /\.hero-copy\s*\{[^}]*opacity:\s*calc/s);
+  assert.match(app, /const onWheel = \(event: WheelEvent\)/);
+  assert.match(app, /goToScene\(current \+ direction\)/);
+  assert.match(app, /touchend/);
+  assert.match(app, /PageDown/);
+  assert.match(app, /matchMedia\("\(max-width: 620px\)"\)/);
 });
 
-test("drives the live shader materials instead of detached uniform descriptors", async () => {
+test("retargets every archive surface gracefully in either direction", async () => {
   const canvas = await readFile(new URL("src/hero/HeroExperience.tsx", root), "utf8");
 
-  assert.match(canvas, /particles\.current\.uniforms\.uProgress\.value/);
-  assert.match(canvas, /backdrop\.current\.uniforms\.uProgress\.value/);
-  assert.match(canvas, /remnant\.current\.uniforms\.uProgress\.value/);
-  assert.match(canvas, /remnant\.current\.uniforms\.uAccretionMap\.value/);
-  // Two clocks. The scroll-derived value arrives as a ref and is damped in the
-  // frame loop; writing it into a uniform directly is what made the hero a flipbook.
-  assert.match(canvas, /progressRef: MutableRefObject<number>/);
-  assert.match(canvas, /narrative\.current = damp\(previous, goal, NARRATIVE_LAMBDA, dt\);/);
-  assert.doesNotMatch(canvas, /uProgress\.value = progress/);
-  assert.doesNotMatch(canvas, /uProgress\.value = clamped/);
-  // \r?\n — the source-text contract must hold on CRLF checkouts too, not just CI's LF.
-  assert.match(canvas, /const remnantUniforms = useMemo[\s\S]*?\[emptyTexture\],\r?\n\s*\);/);
+  assert.match(canvas, /const target = POSES\[definition\.id\]\[scene\]/);
+  assert.match(canvas, /group\.position\.x = THREE\.MathUtils\.damp/);
+  assert.match(canvas, /group\.rotation\.y = THREE\.MathUtils\.damp/);
+  assert.match(canvas, /currentOpacity\.current = THREE\.MathUtils\.damp/);
+  assert.match(canvas, /clock\.elapsedTime/);
+  assert.doesNotMatch(canvas, /uProgress|scrollY|wheel/i);
 });
 
-test("keeps the particle field unbounded so its edge can never enter frame", async () => {
-  const canvas = await readFile(new URL("src/hero/HeroExperience.tsx", root), "utf8");
-
-  // The original defect: a bounded point cloud multiplied up to 3.1x, whose convex
-  // hull crossed into the frustum as a hard, cropped edge.
-  assert.doesNotMatch(canvas, /core \*= mix\(0\.72, 3\.1, swelling\)/);
-  assert.doesNotMatch(canvas, /position \* mix\(1\.0, 0\.105, gravity\)/);
-
-  // Position is derived from a cone seed and wrapped in a travelling depth slab.
-  assert.match(canvas, /float slabZ = -uSpan \+ mod\(aCone\.z \* uSpan - uTravel - uAmbient\.z, uSpan\);/);
-  assert.match(canvas, /float coneRadius = aCone\.x \* uConeSlope \* depth;/);
-  // Approach is a camera move, not a multiplier on the geometry.
-  assert.match(canvas, /float coreDistance = mix\(15\.0, 6\.6, approach\);/);
-  // Both falloffs, or the wrap event and the dataset edge both become visible.
-  assert.match(canvas, /1\.0 - smoothstep\(uRadialFade\.x, uRadialFade\.y, aCone\.x\)/);
-  assert.match(canvas, /smoothstep\(0\.015, 0\.09, depthNormal\) \* \(1\.0 - smoothstep\(0\.8, 1\.0, depthNormal\)\)/);
-});
-
-test("cross-fades hero chapters on a continuous weight rather than an attribute swap", async () => {
+test("guarantees an editorial fallback and an unblankable chapter cross-fade", async () => {
   const [app, css] = await Promise.all([
     readFile(new URL("src/App.tsx", root), "utf8"),
     readFile(new URL("src/styles.css", root), "utf8"),
   ]);
 
-  // Weights are written as custom properties from a rAF loop, not as React state,
-  // so scrolling never re-renders the tree at frame rate.
-  assert.match(app, /hero\.style\.setProperty\(`--w-\$\{id\}`/);
-  assert.match(app, /narrative\.current = damp\(narrative\.current, scrollTarget\.current, lambda, dt\);/);
-  assert.doesNotMatch(app, /setProgress/);
-
-  assert.match(css, /\.hero-copy, \.hero-chapter \{[^}]*opacity: var\(--w\)/);
-  assert.match(css, /\.hero-poster \{ --w: var\(--w-poster, 1\); \}/);
-  // The old swap keyed six display-type blocks off one attribute, which is the
-  // slideshow the sequence used to read as.
-  assert.doesNotMatch(css, /\.hero\[data-phase="gravity"\] \.hero-gravity,[\s\S]*?\.hero\[data-phase="swelling"\]/);
-  // A vignette pinned to a fixed point sat still while the field flew past it.
-  assert.doesNotMatch(css, /radial-gradient\(circle at 76% 48%/);
+  assert.match(app, /className="archive-poster"/);
+  assert.match(app, /archive-poster-collect/);
+  assert.match(app, /archive-poster-grow/);
+  assert.match(app, /className="hero-running-promise"/);
+  assert.match(css, /\.hero-scene \{[^}]*transition: opacity \.55s ease, transform \.9s/s);
+  assert.match(css, /\.hero\[data-scene-index="0"\] \.hero-scene-proposition/);
+  assert.match(css, /\.hero\[data-enhanced="true"\] \.hero-cinematic \{ opacity: 1; \}/);
+  assert.match(css, /\.hero\[data-enhanced="true"\] \.archive-poster \{ opacity: 0; \}/);
+  assert.doesNotMatch(app, /data-phase/);
+  assert.doesNotMatch(css, /core \*=|scale\(3\.1\)|particle/i);
 });
 
 test("attributes self-reported figures and drops unconfirmed ones", async () => {

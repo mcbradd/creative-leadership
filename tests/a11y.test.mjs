@@ -8,7 +8,7 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { HERO_PROGRESS, launch, openPage, scrollHeroTo } from "../scripts/lib/capture.mjs";
+import { HERO_SCENES, launch, openPage, showHeroScene } from "../scripts/lib/capture.mjs";
 import { startSite } from "../scripts/lib/site-server.mjs";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -53,17 +53,17 @@ describe("accessibility", () => {
     });
   }
 
-  test("hero stays accessible through every scroll phase", async () => {
+  test("hero stays accessible through every directed scene", async () => {
     const { page, context } = await openPage(browser, {
       url: url(),
       viewport: { width: 1440, height: 900 },
       fx: "motion",
     });
     try {
-      for (const progress of HERO_PROGRESS) {
-        await scrollHeroTo(page, progress);
+      for (const scene of HERO_SCENES) {
+        await showHeroScene(page, scene);
         const results = await new AxeBuilder({ page }).include(".hero").withTags(TAGS).analyze();
-        assert.equal(results.violations.length, 0, `progress ${progress}:\n${format(results.violations)}`);
+        assert.equal(results.violations.length, 0, `scene ${scene}:\n${format(results.violations)}`);
       }
     } finally {
       await context.close();

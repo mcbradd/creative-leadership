@@ -21,13 +21,8 @@ export const SECTIONS = [
   "contact",
 ];
 
-/**
- * Hero is scroll-driven. These are the centres of the six chapter windows in
- * `src/hero/director.ts`, not evenly spaced samples: the gaps between windows
- * are deliberate dead zones where no copy is legible, so sampling on a uniform
- * grid photographs the beats nobody is meant to read.
- */
-export const HERO_PROGRESS = [0.02, 0.285, 0.485, 0.685, 0.86, 1];
+/** The four authored states in the discrete scene director. */
+export const HERO_SCENES = ["proposition", "partnership", "translation", "proof"];
 
 /**
  * WebGL in headless Chromium needs a software rasteriser. Only paid for when
@@ -63,27 +58,17 @@ export async function settle(page, ms = 400) {
   await page.waitForTimeout(ms);
 }
 
-/**
- * Drives the hero to a given progress value the same way a user would — by
- * scrolling. Progress is derived from the hero's own bounding rect in App.tsx,
- * so scrolling is the only honest way to reach a phase.
- */
-export async function scrollHeroTo(page, progress) {
-  await page.evaluate((p) => {
-    const hero = document.querySelector(".hero");
-    if (!hero) throw new Error(".hero not found");
-    const rect = hero.getBoundingClientRect();
-    const top = rect.top + window.scrollY;
-    const travel = Math.max(1, rect.height - window.innerHeight);
-    window.scrollTo({ top: top + p * travel, behavior: "instant" });
-  }, progress);
-  // The narrative clock is a damper, not a direct binding: at NARRATIVE_LAMBDA = 4
-  // it needs a little over a second of wall time to settle after the scroll lands.
-  await page.waitForTimeout(1400);
+/** Selects a scene through the same chapter control exposed to the audience. */
+export async function showHeroScene(page, scene) {
+  const index = typeof scene === "number" ? scene : HERO_SCENES.indexOf(scene);
+  if (index < 0 || index >= HERO_SCENES.length) throw new Error(`Unknown hero scene: ${scene}`);
+  await page.locator(".hero-scene-nav button").nth(index).click();
+  await page.waitForFunction((id) => document.querySelector(".hero")?.getAttribute("data-scene") === id, HERO_SCENES[index]);
+  await page.waitForTimeout(950);
 }
 
 export async function heroPhase(page) {
-  return page.evaluate(() => document.querySelector(".hero")?.getAttribute("data-phase") ?? null);
+  return page.evaluate(() => document.querySelector(".hero")?.getAttribute("data-scene") ?? null);
 }
 
 /**
@@ -98,7 +83,10 @@ export async function isHeroStatic(page) {
 /** Resolves once the lazy WebGL hero has painted its first frame. */
 export async function waitForCinematic(page, timeout = 15000) {
   await page
-    .waitForFunction(() => document.querySelector(".hero")?.getAttribute("data-enhanced") === "true", null, { timeout })
+    .waitForFunction(() => {
+      const hero = document.querySelector(".hero");
+      return hero?.getAttribute("data-enhanced") === "true" || hero?.getAttribute("data-static") === "true";
+    }, null, { timeout })
     .catch(() => false);
 }
 

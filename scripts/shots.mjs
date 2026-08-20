@@ -11,7 +11,7 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import {
-  HERO_PROGRESS,
+  HERO_SCENES,
   SECTIONS,
   heroPhase,
   isHeroStatic,
@@ -19,7 +19,7 @@ import {
   openPage,
   parseFlags,
   pickViewports,
-  scrollHeroTo,
+  showHeroScene,
   settle,
   shoot,
   waitForCinematic,
@@ -45,17 +45,11 @@ const shots = await withSite(async (url) => {
       const { page, context } = await openPage(browser, { url, viewport, fx, live, deviceScaleFactor });
       const outDir = path.join(outRoot, viewportName);
 
-      if (await isHeroStatic(page)) {
-        // Static/motion tiers pin the hero to the payoff poster — six identical
-        // scroll shots would be noise. Use --fx=webgl --live for the cinematic.
-        written.push(await shoot(page, outDir, "hero-static"));
-      } else {
-        await waitForCinematic(page);
-        for (const progress of HERO_PROGRESS) {
-          await scrollHeroTo(page, progress);
-          const phase = await heroPhase(page);
-          written.push(await shoot(page, outDir, `hero-${String(progress).replace(".", "_")}-${phase}`));
-        }
+      if (!(await isHeroStatic(page))) await waitForCinematic(page);
+      for (const scene of HERO_SCENES) {
+        await showHeroScene(page, scene);
+        const phase = await heroPhase(page);
+        written.push(await shoot(page, outDir, `hero-${phase}`));
       }
 
       for (const id of SECTIONS) {
