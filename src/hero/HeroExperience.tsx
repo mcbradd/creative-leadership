@@ -4,6 +4,7 @@
    ring and the disk arcing over the shadow are solved rather than painted.
    Deliberately dependency-free: a scene graph would cost more than it renders. */
 import { useEffect, useRef } from "react";
+import { heroParams } from "./params";
 
 const VERTEX_SOURCE = `#version 300 es
 precision highp float;
@@ -32,6 +33,10 @@ uniform float uReveal;
 uniform vec2 uGuard;
 uniform sampler2D uMask;
 uniform vec4 uLavaRect;
+uniform float uGravity;
+uniform float uEnergy;
+uniform float uWax;
+uniform vec4 uHud;
 
 const float RS       = 1.0;
 const float DISK_IN  = 2.6;
@@ -72,14 +77,15 @@ float fbm(vec2 p) {
   return sum;
 }
 
-// Inner edge runs white-hot, the rim falls away to a dull ember.
+// A synthwave sunset rather than a blackbody: the inner edge burns white-pink
+// and the rim falls to deep indigo, never through ember brown.
 vec3 diskPalette(float t) {
-  vec3 core  = vec3(1.00, 0.97, 0.92);
-  vec3 gold  = vec3(1.00, 0.74, 0.36);
-  vec3 amber = vec3(0.95, 0.41, 0.12);
-  vec3 rim   = vec3(0.38, 0.12, 0.05);
-  vec3 c = mix(core, gold, smoothstep(0.0, 0.26, t));
-  c = mix(c, amber, smoothstep(0.20, 0.60, t));
+  vec3 core   = vec3(1.00, 0.94, 1.00);
+  vec3 hot    = vec3(1.00, 0.34, 0.74);
+  vec3 magenta= vec3(0.86, 0.18, 0.90);
+  vec3 rim    = vec3(0.20, 0.07, 0.46);
+  vec3 c = mix(core, hot, smoothstep(0.0, 0.26, t));
+  c = mix(c, magenta, smoothstep(0.20, 0.60, t));
   c = mix(c, rim, smoothstep(0.58, 1.0, t));
   return c;
 }
@@ -110,7 +116,7 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   float beam = pow(shift, 2.3);
 
   vec3 col = diskPalette(t);
-  col = mix(col, vec3(0.68, 0.85, 1.00), clamp((shift - 1.0) * 0.5, 0.0, 0.5));
+  col = mix(col, vec3(0.24, 0.94, 1.00), clamp((shift - 1.0) * 0.5, 0.0, 0.5));
   col *= beam;
 
   alpha = clamp(density * 1.15, 0.0, 1.0);
@@ -128,14 +134,14 @@ vec3 skyColor(vec3 dir) {
       vec3 jitter = vec3(hash31(cell + 11.0), hash31(cell + 23.0), hash31(cell + 37.0)) - 0.5;
       float d = length(f - jitter * 0.7);
       float spark = exp(-d * d * 210.0);
-      vec3 tint = mix(vec3(0.60, 0.75, 1.00), vec3(1.00, 0.87, 0.70), hash31(cell + 5.0));
+      vec3 tint = mix(vec3(0.42, 0.88, 1.00), vec3(1.00, 0.52, 0.88), hash31(cell + 5.0));
       col += tint * spark * (0.30 + 0.70 * hash31(cell + 3.0));
     }
     scale *= 2.3;
   }
   // Barely-there dust so the void is not a flat black.
   float dust = fbm(vec2(dir.x * 2.1 + dir.z * 0.7, dir.y * 2.3 + dir.z * 0.4) * 1.5);
-  col += vec3(0.030, 0.045, 0.078) * dust * dust;
+  col += vec3(0.048, 0.020, 0.086) * dust * dust;
   return col;
 }
 
@@ -169,21 +175,22 @@ vec3 trace(vec3 ro, vec3 rd) {
     // Short arcs deep in the well, long strides out in the flat region.
     float dphi = clamp(0.13 / (u * 5.0 + 0.32), 0.012, 0.11);
 
-    // RK4 on the Binet orbit equation: u'' = -u + 1.5 * RS * u^2
+    // RK4 on the Binet orbit equation: u'' = -u + uGravity * RS * u^2,
+    // where uGravity is 1.5 at true Schwarzschild strength.
     float a1 = du;
-    float b1 = -u + 1.5 * RS * u * u;
+    float b1 = -u + uGravity * RS * u * u;
     float ua = u + 0.5 * dphi * a1;
     float da = du + 0.5 * dphi * b1;
     float a2 = da;
-    float b2 = -ua + 1.5 * RS * ua * ua;
+    float b2 = -ua + uGravity * RS * ua * ua;
     float ub = u + 0.5 * dphi * a2;
     float db = du + 0.5 * dphi * b2;
     float a3 = db;
-    float b3 = -ub + 1.5 * RS * ub * ub;
+    float b3 = -ub + uGravity * RS * ub * ub;
     float uc = u + dphi * a3;
     float dc = du + dphi * b3;
     float a4 = dc;
-    float b4 = -uc + 1.5 * RS * uc * uc;
+    float b4 = -uc + uGravity * RS * uc * uc;
 
     u += (dphi / 6.0) * (a1 + 2.0 * a2 + 2.0 * a3 + a4);
     du += (dphi / 6.0) * (b1 + 2.0 * b2 + 2.0 * b3 + b4);
@@ -202,7 +209,7 @@ vec3 trace(vec3 ro, vec3 rd) {
       if (hr > DISK_IN && hr < DISK_OUT) {
         float alpha;
         vec3 emit = sampleDisk(hit, normalize(next - pos), alpha);
-        acc += emit * alpha * transmit;
+        acc += emit * alpha * transmit * uEnergy;
         transmit *= (1.0 - clamp(alpha, 0.0, 1.0));
       }
     }
@@ -251,11 +258,11 @@ vec4 blob(float i, float t) {
 // neck form a boundary instead of blending into mud.
 vec3 blobColor(float i) {
   float h = fract(i * 0.437);
-  vec3 amber = vec3(1.00, 0.46, 0.10);
-  vec3 rose = vec3(1.00, 0.26, 0.42);
-  vec3 violet = vec3(0.60, 0.36, 1.00);
-  vec3 cyan = vec3(0.16, 0.82, 1.00);
-  vec3 c = amber;
+  vec3 magenta = vec3(1.00, 0.18, 0.62);
+  vec3 rose = vec3(1.00, 0.44, 0.86);
+  vec3 violet = vec3(0.52, 0.26, 1.00);
+  vec3 cyan = vec3(0.10, 0.90, 1.00);
+  vec3 c = magenta;
   c = h > 0.26 ? rose : c;
   c = h > 0.50 ? violet : c;
   c = h > 0.74 ? cyan : c;
@@ -297,11 +304,11 @@ vec3 glassWall(vec2 q, vec3 rd, float bulbFall) {
   float curve = clamp(q.x / 2.9, -1.0, 1.0);
   vec3 n = normalize(vec3(curve * 0.95, 0.14, 0.72));
   float fres = pow(1.0 - abs(dot(n, -rd)), 4.0);
-  vec3 col = vec3(0.006, 0.008, 0.014);
-  col += vec3(1.00, 0.52, 0.20) * bulbFall * 0.26;
-  col += vec3(0.52, 0.62, 0.78) * fres * 0.40;
+  vec3 col = vec3(0.008, 0.004, 0.018);
+  col += vec3(1.00, 0.24, 0.70) * bulbFall * 0.28;
+  col += vec3(0.30, 0.86, 1.00) * fres * 0.42;
   float streak = pow(max(0.0, 1.0 - abs(curve * 2.4 - 0.55)), 9.0);
-  col += vec3(0.95, 0.86, 0.74) * streak * bulbFall * 0.55;
+  col += vec3(0.86, 0.72, 1.00) * streak * bulbFall * 0.58;
   return col;
 }
 
@@ -344,9 +351,9 @@ vec3 lavaScene(vec2 q, float t) {
   // Hot wax at the base still carries the bulb; cooled wax up top is dimmer.
   float heat = mix(0.55, 1.35, smoothstep(1.05, -1.05, p.y));
 
-  vec3 col = body * transmit * falloff * (0.62 + 1.05 * wrap) * 3.1 * heat;
+  vec3 col = body * transmit * falloff * (0.62 + 1.05 * wrap) * 2.05 * heat;
   col += body * bulbFall * 0.30;
-  col += vec3(0.96, 0.94, 0.90) * spec * 0.85;
+  col += vec3(0.82, 0.96, 1.00) * spec * 0.55;
   col += body * fres * 0.38;
   return col;
 }
@@ -354,6 +361,86 @@ vec3 lavaScene(vec2 q, float t) {
 vec3 tonemap(vec3 x) {
   const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+// --- Instrument overlay ------------------------------------------------------
+// Drawn in screen space after tone mapping so the linework stays crisp, and
+// driven by the same clock as the simulation it reports on.
+float ellipseRing(vec2 f, vec2 c, vec2 r, float k, float w) {
+  vec2 d = (f - c) / r;
+  float e = length(d);
+  if (e < 1e-4) return 0.0;
+  // Convert the normalised radius error back into pixels.
+  float grad = length((d / e) / r);
+  return smoothstep(w, 0.0, abs(e - k) / max(grad, 1e-5));
+}
+
+vec3 hud(vec2 f, float t) {
+  if (uHud.z < 1.0) return vec3(0.0);
+  vec2 c = uHud.xy;
+  vec2 r = uHud.zw;
+  vec2 d = (f - c) / r;
+  float e = length(d);
+  vec3 cyan = vec3(0.45, 0.85, 1.00);
+  vec3 col = vec3(0.0);
+
+  col += cyan * ellipseRing(f, c, r, 1.00, 1.2) * 0.85;
+  col += cyan * ellipseRing(f, c, r, 0.74, 1.1) * 0.42;
+  col += cyan * ellipseRing(f, c, r, 0.46, 1.1) * 0.26;
+
+  // Radial spokes, fading out past the rim.
+  float a = atan(d.y, d.x);
+  float spoke = abs(fract(a / 6.2831853 * 24.0 + 0.5) - 0.5);
+  col += cyan * smoothstep(0.055, 0.0, spoke) * smoothstep(1.04, 0.42, e) * 0.22;
+
+  // A marker orbiting the well.
+  float oa = t * 0.55;
+  vec2 mp = c + vec2(cos(oa) * r.x, sin(oa) * r.y) * 0.86;
+  float md = length(f - mp);
+  col += vec3(0.70, 0.95, 1.00) * smoothstep(4.2, 0.0, md) * 2.60;
+  col += cyan * smoothstep(34.0, 0.0, md) * 0.30;
+
+  return col;
+}
+
+// Surveying marks over the well: a ticked measurement arc and registration
+// crosshairs, both anchored in screen space so they stay hairline-thin.
+vec3 hudMarks(vec2 f, vec2 res, float t) {
+  vec3 cyan = vec3(0.45, 0.85, 1.00);
+  vec3 col = vec3(0.0);
+
+  // Measurement arc: a hairline rule carrying radial ruler ticks, wrapped
+  // around the shadow rather than cutting across the frame.
+  vec2 ac = vec2(res.x * 0.72, res.y * 0.62);
+  float ar = min(res.x, res.y) * 0.40;
+  vec2 ad = f - ac;
+  float adist = length(ad);
+  float aang = atan(ad.y, ad.x);
+  float arcMask = smoothstep(0.10, 0.55, aang) * smoothstep(2.35, 1.80, aang);
+  col += cyan * smoothstep(1.4, 0.0, abs(adist - ar)) * arcMask * 0.22;
+
+  float phase = fract(aang * 150.0 + t * 0.04);
+  float isTick = smoothstep(0.16, 0.0, min(phase, 1.0 - phase));
+  float longTick = step(0.86, fract(aang * 30.0 + t * 0.008));
+  float reach = mix(5.0, 11.0, longTick);
+  col += cyan * isTick * arcMask * smoothstep(reach, 0.0, abs(adist - ar - reach * 0.5)) * 0.42;
+
+  // Registration crosshairs.
+  for (int i = 0; i < 3; i++) {
+    vec2 m = vec2(0.86, 0.34);
+    if (i == 1) m = vec2(0.30, 0.88);
+    if (i == 2) m = vec2(0.63, 0.19);
+    vec2 mc = m * res;
+    vec2 q = abs(f - mc);
+    float arm = 5.0;
+    float cross = max(
+      smoothstep(0.8, 0.0, q.y) * smoothstep(arm, 0.0, q.x),
+      smoothstep(0.8, 0.0, q.x) * smoothstep(arm, 0.0, q.y)
+    );
+    col += cyan * cross * 0.30;
+  }
+
+  return col;
 }
 
 void main() {
@@ -384,9 +471,10 @@ void main() {
     if (m > 0.002) {
       vec2 q = (gl_FragCoord.xy - uLavaRect.xy) / uLavaRect.zw * 2.0 - 1.0;
           q.x *= 2.7;
-      col = mix(col, tonemap(lavaScene(q, uTime) * 1.45 * uReveal), m);
+      col = mix(col * 0.30, tonemap(lavaScene(q, uTime * uWax) * 0.95 * uReveal), m);
     }
   }
+  col += (hud(gl_FragCoord.xy, uTime) + hudMarks(gl_FragCoord.xy, uRes, uTime)) * uReveal;
   col += (hash21(gl_FragCoord.xy * 0.7 + uTime) - 0.5) * 0.005;
 
   fragColor = vec4(max(col, vec3(0.0)), 1.0);
@@ -511,12 +599,18 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     const uGuard = uniform("uGuard");
     const uMask = uniform("uMask");
     const uLavaRect = uniform("uLavaRect");
+    const uGravity = uniform("uGravity");
+    const uEnergy = uniform("uEnergy");
+    const uWax = uniform("uWax");
+    const uHud = uniform("uHud");
 
     let tier = startingTier();
     let disposed = false;
     let frame = 0;
     let announced = false;
     let started = 0;
+    let simTime = 0;
+    let viewIncl = 0;
     let slowRun = 0;
     let fastRun = 0;
     let lastStamp = 0;
@@ -596,12 +690,18 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       gl.uniform2f(uRes, width, height);
       gl.uniform2f(uCenter, view.center[0], view.center[1]);
       gl.uniform1f(uScale, view.scale);
+      viewIncl = view.incl;
       gl.uniform1f(uIncl, view.incl);
       gl.uniform2f(uGuard, view.guard[0], view.guard[1]);
       gl.uniform1f(uSteps, quality.steps);
       gl.uniform1f(uOctaves, quality.octaves);
       gl.uniform1f(uExposure, view.exposure);
       gl.uniform1i(uMask, 0);
+      // Instrument well: parked between the console and the readout on wide
+      // viewports, and centred low behind the console on a phone.
+      const portrait = height >= width;
+      const rx = portrait ? width * 0.34 : width * 0.15;
+      gl.uniform4f(uHud, width * (portrait ? 0.5 : 0.545), height * (portrait ? 0.14 : 0.115), rx, rx * 0.30);
       buildMask();
     };
 
@@ -619,7 +719,11 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         return;
       }
       if (!started) started = stamp;
-      const elapsed = (stamp - started) / 1000;
+      const wall = (stamp - started) / 1000;
+      // Time scale integrates rather than multiplying wall time: scaling the
+      // elapsed value directly would jump the whole simulation on every drag.
+      simTime += Math.min(0.05, lastStamp ? (stamp - lastStamp) / 1000 : 0) * heroParams.timeScale;
+      const elapsed = simTime;
 
       // Frame-time governor: a sustained slow patch drops a tier and a long
       // fast patch climbs back, so a weak GPU degrades instead of stuttering.
@@ -647,7 +751,11 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       lastStamp = stamp;
 
       gl.uniform1f(uTime, elapsed);
-      gl.uniform1f(uReveal, Math.min(1, elapsed / 1.4));
+      gl.uniform1f(uReveal, Math.min(1, wall / 1.4));
+      gl.uniform1f(uGravity, 1.5 * heroParams.gravity);
+      gl.uniform1f(uEnergy, heroParams.energy);
+      gl.uniform1f(uWax, heroParams.waxFlow);
+      gl.uniform1f(uIncl, viewIncl * heroParams.tilt);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       if (!announced && elapsed > 0.05) {

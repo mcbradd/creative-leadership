@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent, type ReactNode } from "react";
 import { LazyMotion, MotionConfig, m, useReducedMotion } from "motion/react";
 import { detectExperienceTier } from "./experience";
+import { HERO_PARAMS, heroParams, setHeroParam, type HeroParamId } from "./hero/params";
 import {
   capabilityInsights,
   caseStudies,
@@ -252,6 +253,37 @@ function useLensedBackdrop() {
   return { enabled: !failed && (tier === "webgl" || tier === "webgpu"), disable };
 }
 
+function HeroInstruments() {
+  const [values, setValues] = useState(() => ({ ...heroParams }));
+  const set = (id: HeroParamId, next: number) => {
+    // The renderer polls heroParams every frame; state only mirrors it for the
+    // readouts, so the canvas never remounts mid-drag.
+    setHeroParam(id, next);
+    setValues((current) => ({ ...current, [id]: next }));
+  };
+  return (
+    <div className="hero-instruments">
+      <div className="hero-console">
+        <p className="console-title">Simulation feed<span>Event horizon proximity</span></p>
+        {HERO_PARAMS.map((param) => (
+          <label key={param.id} className="console-row">
+            <span>{param.label}</span>
+            <input type="range" min={param.min} max={param.max} step={param.step} value={values[param.id]} onChange={(event) => set(param.id, Number(event.target.value))} />
+            <b>{param.format(values[param.id])}</b>
+          </label>
+        ))}
+      </div>
+      <div className="hero-readout" aria-hidden="true">
+        <p className="console-title">Gravitational well<span>Sagittarius A*</span></p>
+        <p><i>Distance</i><b>26,700 LY</b></p>
+        <p><i>Diameter</i><b>~{Math.round(251 * values.gravity)} AU</b></p>
+        <p><i>Mass</i><b>{(4.31 * values.gravity).toFixed(2)}M☉</b></p>
+        <p><i>Spaghettification</i><b>{values.gravity > 1.4 ? "Active" : "Nominal"}</b></p>
+      </div>
+    </div>
+  );
+}
+
 function HeroSection() {
   const { ref: heroRef, active } = useHeroMotionGate();
   const { enabled, disable } = useLensedBackdrop();
@@ -269,6 +301,7 @@ function HeroSection() {
         <p className="eyebrow">Two disciplines. One leadership system.</p>
         <h1>We turn IP into worlds people can <em className="hero-payoff" data-color-flow="payoff">play, collect, and grow.</em></h1>
         <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="hero-enter" href="#team"><span>Super-Powers Combined</span></a></div>
+        <HeroInstruments />
         <div className="hero-signals" aria-hidden="true"><span>Original voice</span><i /><span>Product reality</span><i /><span>Durable world</span></div>
       </div>
     </section>
