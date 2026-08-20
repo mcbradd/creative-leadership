@@ -6,6 +6,7 @@ import { startSite } from "../scripts/lib/site-server.mjs";
 const CANONICAL_VIEWPORTS = [
   ["phone-320x568", { width: 320, height: 568 }],
   ["phone-390x844", { width: 390, height: 844 }],
+  ["phone-440x956", { width: 440, height: 956 }],
   ["phone-landscape-844x390", { width: 844, height: 390 }],
   ["tablet-768x1024", { width: 768, height: 1024 }],
   ["tablet-landscape-1024x768", { width: 1024, height: 768 }],
@@ -14,8 +15,12 @@ const CANONICAL_VIEWPORTS = [
   ["wide-2560x1440", { width: 2560, height: 1440 }],
 ];
 
-const MOBILE_VIEWPORTS = CANONICAL_VIEWPORTS.slice(0, 3);
-const DYNAMIC_VIEWPORTS = [CANONICAL_VIEWPORTS[0], CANONICAL_VIEWPORTS[2]];
+const MOBILE_VIEWPORTS = CANONICAL_VIEWPORTS.slice(0, 4);
+const DYNAMIC_VIEWPORTS = [CANONICAL_VIEWPORTS[0], CANONICAL_VIEWPORTS[3]];
+const LEADER_CARD_VIEWPORTS = [
+  ...CANONICAL_VIEWPORTS.slice(0, 3),
+  CANONICAL_VIEWPORTS.find(([name]) => name === "desktop-1440x900"),
+];
 const SECTION_HEADINGS = [
   ["partnership", "#team h2"],
   ["joint proof", "#proof h2"],
@@ -229,6 +234,111 @@ describe("responsive layout contract", () => {
 
         await assertDocumentHasNoHorizontalOverflow(page, `${name} after dynamic surfaces`);
         await assertNoFaults(page, faults, `${name} dynamic surfaces`);
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
+  test("leader portraits, text plates, and actions remain geometrically separate and contained", async () => {
+    for (const [name, viewport] of LEADER_CARD_VIEWPORTS) {
+      const { context, page, faults } = await openAuditedPage(viewport);
+      try {
+        const cards = page.locator("#team .leader-card");
+        await cards.first().scrollIntoViewIfNeeded();
+        await cards.first().locator(".portrait-wrap img").waitFor({ state: "visible" });
+
+        const reports = await cards.evaluateAll((elements) => {
+          const bounds = (element) => {
+            const rect = element.getBoundingClientRect();
+            return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+          };
+          const objectPositionFraction = (token, axis) => {
+            if (token.endsWith("%")) return Number.parseFloat(token) / 100;
+            if (token === "left" || token === "top") return 0;
+            if (token === "right" || token === "bottom") return 1;
+            if (token === "center") return 0.5;
+            const pixels = Number.parseFloat(token);
+            return Number.isFinite(pixels) ? (axis === "x" ? 0.5 : 0.5) : 0.5;
+          };
+
+          return elements.map((card) => {
+            const portrait = card.querySelector(".portrait-wrap");
+            const image = portrait?.querySelector("img");
+            const plate = card.querySelector(".leader-copy");
+            if (!(portrait instanceof HTMLElement) || !(image instanceof HTMLImageElement) || !(plate instanceof HTMLElement)) {
+              return { error: "leader card is missing its portrait, image, or lower text plate" };
+            }
+
+            const cardRect = bounds(card);
+            const imageRect = bounds(image);
+            const plateRect = bounds(plate);
+            const imageStyle = getComputedStyle(image);
+            const naturalWidth = image.naturalWidth;
+            const naturalHeight = image.naturalHeight;
+            const [rawX = "50%", rawY = "50%"] = imageStyle.objectPosition.split(/\s+/);
+            const positionX = objectPositionFraction(rawX, "x");
+            const positionY = objectPositionFraction(rawY, "y");
+            const coverScale = Math.max(imageRect.width / naturalWidth, imageRect.height / naturalHeight);
+            const containScale = Math.min(imageRect.width / naturalWidth, imageRect.height / naturalHeight);
+            const scale = imageStyle.objectFit === "contain" ? containScale : imageStyle.objectFit === "fill" ? null : coverScale;
+            const renderedWidth = scale === null ? imageRect.width : naturalWidth * scale;
+            const renderedHeight = scale === null ? imageRect.height : naturalHeight * scale;
+            const renderedLeft = imageRect.left + (imageRect.width - renderedWidth) * positionX;
+            const renderedTop = imageRect.top + (imageRect.height - renderedHeight) * positionY;
+
+            // Measured against the source portraits: includes hairline through chin,
+            // while deliberately excluding shoulders/torso that a plate may cover.
+            const focal = card.classList.contains("leader-bradd")
+              ? { left: 0.29, top: 0.035, right: 0.79, bottom: 0.64 }
+              : { left: 0.24, top: 0.01, right: 0.86, bottom: 0.66 };
+            const face = {
+              left: renderedLeft + focal.left * renderedWidth,
+              top: renderedTop + focal.top * renderedHeight,
+              right: renderedLeft + focal.right * renderedWidth,
+              bottom: renderedTop + focal.bottom * renderedHeight,
+            };
+            const text = [
+              ["index", card.querySelector(".leader-index")],
+              ["role", card.querySelector(".leader-role")],
+              ["name", card.querySelector(".leader-copy > strong")],
+              ["summary", card.querySelector(".leader-copy > span:not(.leader-role):not(.leader-open)")],
+              ["action", card.querySelector(".leader-open")],
+            ].map(([label, element]) => ({ label, rect: element instanceof HTMLElement ? bounds(element) : null }));
+
+            return {
+              label: card.classList.contains("leader-bradd") ? "Bradd" : "Stone",
+              card: cardRect,
+              plate: plateRect,
+              face,
+              text,
+              clientWidth: card.clientWidth,
+              scrollWidth: card.scrollWidth,
+              imageLoaded: image.complete && naturalWidth > 0 && naturalHeight > 0,
+            };
+          });
+        });
+
+        assert.equal(reports.length, 2, `${name} should render both leader cards`);
+        for (const report of reports) {
+          assert.equal(report.error, undefined, `${name}: ${report.error}`);
+          assert.equal(report.imageLoaded, true, `${name} ${report.label} portrait did not load`);
+          assert.ok(report.card.width >= 44 && report.card.height >= 44, `${name} ${report.label} card target is smaller than 44px`);
+          assert.ok(report.scrollWidth <= report.clientWidth + EPSILON, `${name} ${report.label} card has ${report.scrollWidth - report.clientWidth}px internal horizontal overflow`);
+          assert.ok(report.face.left >= report.card.left - EPSILON && report.face.right <= report.card.right + EPSILON, `${name} ${report.label} face focal region is horizontally cropped out of its card`);
+          assert.ok(report.plate.top >= report.face.bottom - EPSILON, `${name} ${report.label} lower text plate overlaps the portrait focal region by ${(report.face.bottom - report.plate.top).toFixed(1)}px`);
+
+          for (const item of report.text) {
+            assert.ok(item.rect, `${name} ${report.label} is missing ${item.label} text`);
+            assert.ok(item.rect.left >= report.card.left - EPSILON, `${name} ${report.label} ${item.label} text escapes the left edge of its card`);
+            assert.ok(item.rect.right <= report.card.right + EPSILON, `${name} ${report.label} ${item.label} text escapes the right edge of its card`);
+            assert.ok(item.rect.top >= report.card.top - EPSILON, `${name} ${report.label} ${item.label} text escapes the top of its card`);
+            assert.ok(item.rect.bottom <= report.card.bottom + EPSILON, `${name} ${report.label} ${item.label} text escapes the bottom of its card`);
+          }
+        }
+
+        await assertDocumentHasNoHorizontalOverflow(page, `${name} leader cards`);
+        await assertNoFaults(page, faults, `${name} leader cards`);
       } finally {
         await context.close();
       }

@@ -21,9 +21,6 @@ export const SECTIONS = [
   "contact",
 ];
 
-/** The four authored states in the discrete scene director. */
-export const HERO_SCENES = ["proposition", "partnership", "translation", "proof"];
-
 /**
  * WebGL in headless Chromium needs a software rasteriser. Only paid for when
  * the caller actually wants the `webgl`/`webgpu` tier.
@@ -51,43 +48,41 @@ export async function openPage(browser, { url, viewport, fx, live = false, devic
   return { page, context };
 }
 
-/** Fonts and lazy hero chunk both shift layout; wait for them before shooting. */
+/** Fonts and initial client effects can both shift layout; wait before shooting. */
 export async function settle(page, ms = 400) {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.waitForTimeout(ms);
 }
 
-/** Selects a scene through the same chapter control exposed to the audience. */
-export async function showHeroScene(page, scene) {
-  const index = typeof scene === "number" ? scene : HERO_SCENES.indexOf(scene);
-  if (index < 0 || index >= HERO_SCENES.length) throw new Error(`Unknown hero scene: ${scene}`);
-  await page.locator(".hero-scene-nav button").nth(index).click();
-  await page.waitForFunction((id) => document.querySelector(".hero")?.getAttribute("data-scene") === id, HERO_SCENES[index]);
-  await page.waitForTimeout(950);
-}
-
-export async function heroPhase(page) {
-  return page.evaluate(() => document.querySelector(".hero")?.getAttribute("data-scene") ?? null);
+/** Waits until the single teaser hero reaches its reduced or active motion mode. */
+export async function waitForHeroMotion(page, expected, timeout = 6000) {
+  if (expected !== "reduced" && expected !== "active") throw new Error(`Unknown hero motion mode: ${expected}`);
+  await page.locator(".hero").waitFor({ state: "visible", timeout });
+  await page.waitForFunction(
+    (mode) => document.querySelector(".hero")?.getAttribute("data-motion") === mode,
+    expected,
+    { timeout },
+  );
 }
 
 /**
- * App.tsx only runs the cinematic when the tier is webgl/webgpu AND reduced
- * motion is off; otherwise the hero is pinned to the `payoff` poster. Ask the
- * DOM rather than inferring it from flags — the tier probe can also decline.
+ * Pauses the authored one-shot hero animations at a shared timeline position,
+ * making the active screenshot repeatable enough for visual review.
  */
-export async function isHeroStatic(page) {
-  return page.evaluate(() => document.querySelector(".hero")?.getAttribute("data-static") === "true");
-}
-
-/** Resolves once the lazy WebGL hero has painted its first frame. */
-export async function waitForCinematic(page, timeout = 6000) {
-  await page
-    .waitForFunction(() => {
-      const hero = document.querySelector(".hero");
-      return hero?.getAttribute("data-enhanced") === "true" || hero?.getAttribute("data-static") === "true";
-    }, null, { timeout })
-    .catch(() => false);
+export async function freezeHeroMotion(page, currentTime = 1800) {
+  if (!Number.isFinite(currentTime) || currentTime < 0) throw new Error(`Invalid hero motion time: ${currentTime}`);
+  const count = await page.locator(".hero").evaluate((hero, at) => {
+    const animations = hero.getAnimations({ subtree: true });
+    for (const animation of animations) {
+      animation.pause();
+      animation.currentTime = at;
+    }
+    return animations.length;
+  }, currentTime);
+  if (count === 0) throw new Error("Active hero exposed no animations to capture");
+  await page.waitForTimeout(50);
+  return count;
 }
 
 export async function shoot(page, outDir, name) {

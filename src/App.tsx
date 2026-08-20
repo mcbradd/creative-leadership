@@ -83,6 +83,7 @@ function LeaderCard({ leader, onOpen }: { leader: "bradd" | "stone"; onOpen: () 
   return (
     <button className={`leader-card leader-${leader}`} type="button" onPointerMove={handlePointer} onPointerLeave={(event) => { event.currentTarget.style.setProperty("--card-x", "0deg"); event.currentTarget.style.setProperty("--card-y", "0deg"); }} onClick={onOpen} aria-label={`Open the complete ${isBradd ? "Bradd McBrearty" : "Stone Perales"} leadership profile`}>
       <span className="portrait-wrap"><img src={media(`${leader}-portrait.webp`)} alt={isBradd ? "Bradd McBrearty" : "Stone Perales"} width="1122" height="1402" /><span className="portrait-sheen" aria-hidden="true" /></span>
+      <span className="leader-foil" aria-hidden="true" />
       <span className="leader-index">{isBradd ? "01" : "02"} / {isBradd ? "CREATIVE + PRODUCT" : "ART + FRANCHISE"}</span>
       <span className="leader-copy"><span className="leader-role">{isBradd ? "Creative Director" : "Art Director"}</span><strong>{isBradd ? "Bradd McBrearty" : "Stone Perales"}</strong><span>{isBradd ? "Game design · Product strategy · Technical direction · Production systems" : "Worldbuilding · Visual identity · Franchise systems · Licensed products"}</span><span className="leader-open">Open complete profile <b aria-hidden="true">↗</b></span></span>
     </button>
@@ -196,14 +197,49 @@ function Toast({ notice, onDismiss }: { notice: Notice | null; onDismiss: () => 
   return <div className={`toast${notice ? " toast-visible" : ""}`} data-kind={notice?.kind ?? "info"} data-fit-check onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)} onFocusCapture={() => setFocusWithin(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocusWithin(false); }}><span aria-hidden="true">{notice?.kind === "success" ? "✓" : "i"}</span><p role="status" aria-live="polite" aria-atomic="true">{notice && <span key={notice.id}>{notice.message}</span>}</p><button type="button" aria-label="Dismiss notification" aria-hidden={!notice} disabled={!notice} tabIndex={notice ? 0 : -1} onClick={onDismiss}>×</button></div>;
 }
 
+function useHeroMotionGate() {
+  const ref = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const hero = ref.current;
+    if (!hero) return;
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let intersects = false;
+    let observer: IntersectionObserver | null = null;
+    const sync = () => {
+      const next = reduced.matches ? "reduced" : intersects && document.visibilityState === "visible" ? "active" : "paused";
+      if (hero.dataset.motion !== next) hero.dataset.motion = next;
+    };
+
+    if ("IntersectionObserver" in window) {
+      observer = new IntersectionObserver(([entry]) => { intersects = Boolean(entry?.isIntersecting); sync(); });
+      observer.observe(hero);
+    } else intersects = true;
+
+    reduced.addEventListener("change", sync);
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => {
+      observer?.disconnect();
+      reduced.removeEventListener("change", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
+  }, []);
+
+  return ref;
+}
+
 function HeroSection() {
+  const heroRef = useHeroMotionGate();
   return (
-    <section className="hero" id="top" data-static="true" data-enhanced="false">
+    <section ref={heroRef} className="hero" id="top" data-motion="idle" data-static="true" data-enhanced="true">
       <div className="hero-grid" aria-hidden="true" />
+      <div className="hero-light-field" aria-hidden="true"><i /><i /></div>
       <div className="hero-orbit" aria-hidden="true"><span /><i /></div>
       <div className="hero-shell">
         <p className="eyebrow">Two disciplines. One leadership system.</p>
-        <h1>We turn IP into worlds people can <em>play, collect, and grow.</em></h1>
+        <h1>We turn IP into worlds people can <em className="hero-payoff" data-color-flow="payoff">play, collect, and grow.</em></h1>
         <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="hero-enter" href="#team"><span>Enter the partnership</span><b aria-hidden="true">↘</b></a></div>
         <div className="hero-signals" aria-hidden="true"><span>Original voice</span><i /><span>Product reality</span><i /><span>Durable world</span></div>
       </div>

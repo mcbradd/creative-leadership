@@ -11,18 +11,14 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import {
-  HERO_SCENES,
   SECTIONS,
-  heroPhase,
-  isHeroStatic,
+  freezeHeroMotion,
   launch,
   openPage,
   parseFlags,
   pickViewports,
-  showHeroScene,
-  settle,
   shoot,
-  waitForCinematic,
+  waitForHeroMotion,
 } from "./lib/capture.mjs";
 import { withSite } from "./lib/site-server.mjs";
 
@@ -35,6 +31,24 @@ const viewports = pickViewports(flags.viewport);
 
 await rm(outRoot, { recursive: true, force: true });
 
+async function captureHero(browser, { url, viewport, fx, deviceScaleFactor, outDir, active }) {
+  const { page, context } = await openPage(browser, {
+    url,
+    viewport,
+    fx,
+    live: active,
+    deviceScaleFactor,
+  });
+
+  try {
+    await waitForHeroMotion(page, active ? "active" : "reduced");
+    if (active) await freezeHeroMotion(page);
+    return await shoot(page, outDir, active ? "hero-active" : "hero-stable");
+  } finally {
+    await context.close();
+  }
+}
+
 const shots = await withSite(async (url) => {
   const browser = await launch(fx);
   const written = [];
@@ -42,27 +56,24 @@ const shots = await withSite(async (url) => {
   try {
     for (const [viewportName, viewport] of viewports) {
       const before = written.length;
-      const { page, context } = await openPage(browser, { url, viewport, fx, live, deviceScaleFactor });
       const outDir = path.join(outRoot, viewportName);
 
-      if (!(await isHeroStatic(page))) await waitForCinematic(page);
-      for (const scene of HERO_SCENES) {
-        await showHeroScene(page, scene);
-        const phase = await heroPhase(page);
-        written.push(await shoot(page, outDir, `hero-${phase}`));
+      written.push(await captureHero(browser, { url, viewport, fx, deviceScaleFactor, outDir, active: false }));
+      written.push(await captureHero(browser, { url, viewport, fx, deviceScaleFactor, outDir, active: true }));
+
+      const { page, context } = await openPage(browser, { url, viewport, fx, live, deviceScaleFactor });
+      try {
+        for (const id of SECTIONS) {
+          await page.evaluate((sectionId) => {
+            document.getElementById(sectionId)?.scrollIntoView({ behavior: "instant", block: "start" });
+          }, id);
+          await page.waitForTimeout(250);
+          written.push(await shoot(page, outDir, `section-${id}`));
+        }
+      } finally {
+        await context.close();
       }
 
-      for (const id of SECTIONS) {
-        await page.evaluate((sectionId) => {
-          document.getElementById(sectionId)?.scrollIntoView({ behavior: "instant", block: "start" });
-        }, id);
-        await page.waitForTimeout(250);
-        written.push(await shoot(page, outDir, `section-${id}`));
-      }
-
-      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-      await settle(page, 200);
-      await context.close();
       console.log(`${viewportName}: ${written.length - before} shots`);
     }
   } finally {

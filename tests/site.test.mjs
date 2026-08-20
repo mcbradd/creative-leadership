@@ -46,19 +46,28 @@ test("uses a mobile-first responsive shell with safe dynamic overlays", async ()
   assert.doesNotMatch(css, /Inter Variable|Newsreader Variable|Arial Narrow|Aptos Narrow/);
 });
 
-test("keeps the intro as a distinct abstract teaser before partnership and proof", async () => {
-  const app = await source("src/App.tsx");
+test("keeps the intro as a layered abstract teaser before partnership and proof", async () => {
+  const [app, css] = await Promise.all([
+    source("src/App.tsx"),
+    source("src/styles.css"),
+  ]);
   const hero = app.split("function HeroSection")[1].split("export default function App")[0];
 
   assert.match(hero, /className="hero"/);
   assert.match(hero, /We turn IP into worlds people can/);
-  assert.match(hero, /className="hero-orbit" aria-hidden="true"/);
+  for (const layer of ["hero-grid", "hero-orbit", "hero-light-field"]) {
+    assert.match(hero, new RegExp(`className="${layer}" aria-hidden="true"`), `${layer} must remain decorative`);
+    assert.match(css, new RegExp(`\\.${layer}(?:\\W|$)`), `${layer} needs a visual treatment`);
+  }
+  const payoffTag = hero.match(/<em[^>]*>play, collect, and grow\.<\/em>/)?.[0] ?? "";
+  assert.match(payoffTag, /className="hero-payoff"/);
+  assert.match(payoffTag, /data-color-flow="payoff"/);
+  assert.match(css, /\.hero-payoff(?:\W|$)/);
   assert.match(hero, /href="#team"/);
-  assert.doesNotMatch(hero, /<img|<button|LeaderCard|leaderInsights|jointInsights|Tetris|tetris-|heroChapters|hero-scene|data-scene|onOpenLeader|onOpenProof/);
+  assert.doesNotMatch(hero, /<img|<button|LeaderCard|leaderInsights|jointInsights|Tetris|tetris-|heroChapters|hero-scene|hero-art|collage|data-scene|onOpenLeader|onOpenProof|B\+S/i);
   assert.match(app, /<section className="team-section" id="team"/);
   assert.match(app, /<section className="proof-section" id="proof"/);
   assert.match(app, /Open the complete Tetris Beat joint case file/);
-  assert.doesNotMatch(app, /B\+S/);
   assert.doesNotMatch(app, /addEventListener\("wheel"|onWheel|WheelEvent/);
 });
 

@@ -30,19 +30,62 @@ describe("mobile-first executive one-pager interactions", () => {
     try {
       const hero = page.locator(".hero");
       assert.match((await hero.getByRole("heading", { level: 1 }).textContent()) ?? "", /We turn IP into worlds people can\s+play, collect, and grow\./);
-      assert.equal(await hero.locator('.hero-orbit[aria-hidden="true"]').count(), 1);
+      const spectacleLayers = hero.locator('.hero-grid[aria-hidden="true"], .hero-orbit[aria-hidden="true"], .hero-light-field[aria-hidden="true"]');
+      assert.equal(await spectacleLayers.count(), 3);
+      assert.deepEqual(await spectacleLayers.evaluateAll((layers) => layers.map((layer) => getComputedStyle(layer).pointerEvents)), ["none", "none", "none"]);
       assert.equal(await hero.locator("img").count(), 0);
       assert.equal(await hero.locator("button").count(), 0);
       assert.equal(await hero.locator(".hero-scene-nav").count(), 0);
       assert.equal(await hero.getAttribute("data-scene"), null);
-      assert.doesNotMatch((await hero.textContent()) ?? "", /Tetris|Apple Arcade|shipped together/i);
+      assert.doesNotMatch((await hero.textContent()) ?? "", /Tetris|Apple Arcade|shipped together|B\+S/i);
+      const payoff = hero.locator('.hero-payoff[data-color-flow="payoff"]');
+      assert.equal(await payoff.count(), 1);
+      assert.equal((await payoff.textContent())?.trim(), "play, collect, and grow.");
+      assert.equal(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), true);
+      assert.equal(await hero.evaluate((node) => node.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running").length), 0);
 
       const partnershipLink = hero.locator('a[href="#team"]');
       assert.equal(await partnershipLink.count(), 1);
-      await partnershipLink.click();
+      assert.equal(await partnershipLink.evaluate((link) => link.tagName), "A");
+      await partnershipLink.focus();
+      await page.keyboard.press("Enter");
       await page.waitForFunction(() => window.location.hash === "#team");
       assert.equal(await page.evaluate(() => window.location.hash), "#team");
       assert.equal(await page.locator("#team .leader-card").count(), 2);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("hero motion runs onscreen and fully pauses offscreen", async () => {
+    const { page, context } = await openPage(browser, {
+      url: site.url,
+      viewport: { width: 390, height: 844 },
+      fx: "motion",
+      live: true,
+    });
+    try {
+      const hero = page.locator(".hero");
+      await page.waitForFunction(() => document.querySelector(".hero")?.getAttribute("data-motion") === "active");
+      assert.equal(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), false);
+
+      const onscreenAnimations = await hero.evaluate((node) => node.getAnimations({ subtree: true }).map((animation) => ({
+        name: animation.animationName,
+        playState: animation.playState,
+      })));
+      assert.deepEqual(
+        onscreenAnimations.map(({ name }) => name).sort(),
+        ["hero-orbit-settle", "hero-payoff-flow", "hero-trace-x", "hero-trace-y"].sort(),
+      );
+      assert.equal(onscreenAnimations.every(({ playState }) => playState === "running"), true, JSON.stringify(onscreenAnimations));
+
+      await page.locator("#contact").scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => document.querySelector(".hero")?.getAttribute("data-motion") === "paused");
+      const offscreenAnimations = await hero.evaluate((node) => node.getAnimations({ subtree: true }).map((animation) => ({
+        name: animation.animationName,
+        playState: animation.playState,
+      })));
+      assert.equal(offscreenAnimations.some(({ playState }) => playState === "running"), false, JSON.stringify(offscreenAnimations));
     } finally {
       await context.close();
     }
