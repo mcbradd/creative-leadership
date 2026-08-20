@@ -3,177 +3,169 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
+const source = (file) => readFile(new URL(file, root), "utf8");
 
-test("publishes a private-by-convention executive artifact", async () => {
+test("publishes a private-by-convention executive artifact with an immediate proposition", async () => {
   const [html, app, content] = await Promise.all([
-    readFile(new URL("index.html", root), "utf8"),
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/content.ts", root), "utf8"),
+    source("index.html"),
+    source("src/App.tsx"),
+    source("src/content.ts"),
   ]);
 
   assert.match(html, /noindex, nofollow, noarchive/);
   assert.match(html, /Bradd \+ Stone — Creative Leadership/);
-  assert.match(app, /WE TURN IP INTO WORLDS PEOPLE CAN/);
-  assert.match(app, /Not two résumés\. One shipped result\./);
-  assert.match(app, /We build people who build worlds\./);
-  assert.match(content, /Two successful funding rounds/);
-  assert.match(app, /aria-modal="true"/);
+  assert.match(app, /We turn IP into worlds people can/);
+  assert.match(app, /One accountable team from first idea to market-ready experience\./);
+  assert.match(app, /Not two résumés\.[\s\S]*One shipped result\./);
+  assert.match(content, /two successful seed rounds totaling more than \$7M/i);
   assert.match(app, /<main id="main-content" tabIndex=\{-1\}>/);
 });
 
 test("does not expose private opportunity language", async () => {
   const files = await Promise.all([
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/content.ts", root), "utf8"),
-    readFile(new URL("index.html", root), "utf8"),
+    source("src/App.tsx"),
+    source("src/content.ts"),
+    source("index.html"),
   ]);
   const publicCopy = files.join("\n");
 
   assert.doesNotMatch(publicCopy, /Upper Deck|Carlin|Danny Trejo|Year of (the )?Devil/i);
 });
 
-test("keeps the live artifact responsive and motion-aware", async () => {
-  const css = await readFile(new URL("src/styles.css", root), "utf8");
-  assert.match(css, /@media \(max-width: 620px\)/);
+test("uses a mobile-first responsive shell with safe dynamic overlays", async () => {
+  const css = await source("src/styles.css");
+
+  assert.match(css, /@media \(min-width: 700px\)/);
+  assert.match(css, /@media \(min-width: 1020px\)/);
+  assert.match(css, /@media \(max-width: 699px\) and \(max-height: 650px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css, /100dvh/);
+  assert.match(css, /env\(safe-area-inset-(?:top|right|bottom|left)\)/);
   assert.match(css, /font-kerning: normal/);
   assert.match(css, /Mona Sans Variable/);
   assert.match(css, /Source Serif 4 Variable/);
-  assert.doesNotMatch(css, /Inter Variable|Newsreader Variable/);
-  assert.doesNotMatch(css, /Arial Narrow|Aptos Narrow/);
+  assert.doesNotMatch(css, /Inter Variable|Newsreader Variable|Arial Narrow|Aptos Narrow/);
 });
 
-test("makes every visual affordance actionable and uses upgraded proof imagery", async () => {
+test("exposes four explicit hero chapters without trapping wheel scrolling", async () => {
+  const app = await source("src/App.tsx");
+  const chapterBlock = app.split("const heroChapters = [")[1].split("] as const;")[0];
+  const ids = [...chapterBlock.matchAll(/id: "([^"]+)"/g)].map((match) => match[1]);
+
+  assert.deepEqual(ids, ["proposition", "partnership", "translation", "proof"]);
+  assert.match(app, /className="hero-scene-nav"/);
+  assert.match(app, /aria-pressed=\{scene === chapter\.id\}/);
+  assert.match(app, /onClick=\{\(\) => setScene\(chapter\.id\)\}/);
+  assert.match(app, /onKeyDown=\{\(event\) => handleChapterKey\(event, index\)\}/);
+  assert.match(app, /event\.key === "ArrowRight" \|\| event\.key === "ArrowDown"/);
+  assert.match(app, /event\.key === "ArrowLeft" \|\| event\.key === "ArrowUp"/);
+  assert.match(app, /event\.key === "Home"/);
+  assert.match(app, /event\.key === "End"/);
+  assert.doesNotMatch(app, /addEventListener\("wheel"|onWheel|WheelEvent/);
+});
+
+test("renders complete situation, contribution, evidence, relevance, and attribution disclosures", async () => {
+  const [app, content] = await Promise.all([
+    source("src/App.tsx"),
+    source("src/content.ts"),
+  ]);
+
+  for (const field of ["statement", "brief", "moves", "proof", "relevance", "sourceNote"]) {
+    assert.match(content, new RegExp(`${field}\\??: `), `content schema must expose ${field}`);
+  }
+  assert.match(content, /owner: "Bradd" \| "Stone" \| "Joint"/);
+  assert.match(content, /relationship: string/);
+  assert.match(content, /export const jointInsights/);
+  assert.match(app, /aria-describedby="detail-summary"/);
+  assert.match(app, /01 \/ The situation/);
+  assert.match(app, /02 \/ Why it matters/);
+  assert.match(app, /detail\.relevance/);
+  assert.match(app, /detail\.moves\.map/);
+  assert.match(app, /detail\.proof\.map/);
+  assert.match(app, /04 \/ Evidence in context/);
+  assert.match(app, /detail\.sourceNote &&/);
+  assert.match(app, /Attribution note/);
+});
+
+test("uses real evidence imagery for every range lens and removes the abstract seed", async () => {
+  const [app, content, css] = await Promise.all([
+    source("src/App.tsx"),
+    source("src/content.ts"),
+    source("src/styles.css"),
+  ]);
+
+  assert.match(content, /export const rangeVisuals/);
+  assert.match(content, /play: \{ image: "ultimate-rivals-hires\.webp"/);
+  assert.match(content, /collect: \{ image: "stone-raid-hires\.webp"/);
+  assert.match(content, /grow: \{ image: "stone-chaotic-hires\.webp"/);
+  assert.match(app, /className="range-visual"/);
+  assert.match(app, /src=\{media\(rangeVisual\.image\)\}/);
+  assert.match(app, /alt=\{rangeVisual\.alt\}/);
+  assert.doesNotMatch(`${app}\n${css}`, /range-seed|data-mode=|WorldSeed/);
+});
+
+test("makes modal, navigation, toast, and visual-card affordances actionable", async () => {
   const [app, css] = await Promise.all([
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/styles.css", root), "utf8"),
+    source("src/App.tsx"),
+    source("src/styles.css"),
   ]);
 
-  assert.match(app, /onClick=\{continueFromHero\}/);
-  assert.match(app, /role="tablist"/);
-  assert.match(app, /role="tabpanel"/);
-  assert.match(app, /onClick=\{\(\) => openInsight\(insight\)\}/);
+  assert.match(app, /function DetailDialog/);
+  assert.match(app, /function NavigationDialog/);
+  assert.match(app, /function Toast/);
+  assert.match(app, /dialog\.showModal\(\)/);
+  assert.match(app, /className="detail-dialog" aria-modal="true"/);
+  assert.match(app, /className="nav-dialog" aria-modal="true"/);
+  assert.match(app, /aria-expanded=\{navOpen\}/);
+  assert.match(app, /aria-label="Open presentation navigation"/);
+  assert.match(app, /role="status" aria-live="polite"/);
+  assert.match(app, /aria-label="Dismiss notification"/);
+  assert.match(app, /showNotice\("Email copied\.[^\n]+"success"\)/);
+  assert.match(app, /showNotice\(`Copy was unavailable\.[^\n]+"info"\)/);
+  assert.match(app, /data-fit-check/);
   assert.match(app, /target="_blank" rel="noopener noreferrer"/);
-  assert.match(app, /tetris-beat-cover\.webp/);
-  assert.match(app, /tetris-beat-gameplay\.webp/);
-  assert.match(app, /crayola-funny-faces-front\.webp/);
-  assert.match(app, /<dialog/);
-  assert.match(css, /\.experience-canvas \{[^}]*pointer-events: none/s);
-  assert.match(css, /\.social-button \{/);
-});
-
-test("ships a progressively enhanced, continuously alive archive experience", async () => {
-  const [app, experience, canvas] = await Promise.all([
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/experience.ts", root), "utf8"),
-    readFile(new URL("src/hero/HeroExperience.tsx", root), "utf8"),
-  ]);
-
-  assert.match(app, /lazy\(\(\) => import\("\.\/hero\/HeroExperience"\)\)/);
-  assert.match(experience, /"static" \| "motion" \| "webgl" \| "webgpu"/);
-  assert.match(experience, /saveData/);
-  assert.match(experience, /requestedCinematic/);
-  assert.match(canvas, /frameloop=\{active \? "always" : "demand"\}/);
-  assert.match(canvas, /powerPreference: "high-performance"/);
-  assert.match(canvas, /sceneRef: MutableRefObject<number>/);
-  assert.match(canvas, /useFrame\(\(\{ clock \}, delta\)/);
-  assert.match(canvas, /THREE\.MathUtils\.damp/);
-  assert.match(canvas, /bradd-portrait\.webp/);
-  assert.match(canvas, /stone-portrait\.webp/);
-  assert.match(canvas, /tetris-beat-gameplay\.webp/);
-  assert.match(canvas, /stone-raid-hires\.webp/);
-  assert.match(canvas, /stone-chaotic-hires\.webp/);
-  assert.match(canvas, /<DepthArchitecture/);
-  assert.doesNotMatch(canvas, /ParticleResolve|WorldSeed/);
-  assert.doesNotMatch(canvas, /particle|starfield|black hole/i);
-  assert.match(app, /class HeroLazyBoundary/);
-  assert.match(canvas, /gl\.debug\.onShaderError/);
-  assert.match(canvas, /<FirstFrameReady/);
-  assert.match(canvas, /nearWhite \/ opaque > 0\.55/);
-  assert.doesNotMatch(canvas, /gl\.compile\(scene, camera\)/);
+  assert.match(app, /className="proof-visual"[^>]*onClick/s);
+  assert.match(app, /className="collab-art"[^>]*onClick/s);
+  assert.match(app, /className=\{`supporting-card[^>]*onClick=\{\(\) => openInsight\(item\)\}/s);
+  assert.match(css, /\.detail-dialog, \.nav-dialog \{[^}]*100dvh/s);
+  assert.match(css, /\.toast \{[^}]*position: fixed/s);
+  assert.match(css, /\.toast button \{[^}]*min-width: 44px;[^}]*min-height: 44px/s);
 });
 
 test("keeps representation balanced in the featured case sequence", async () => {
-  const content = await readFile(new URL("src/content.ts", root), "utf8");
+  const content = await source("src/content.ts");
   const caseBlock = content.split("export const caseStudies")[1].split("export const partners")[0];
   const owners = [...caseBlock.matchAll(/owner: "(Bradd|Stone)"/g)].map((match) => match[1]);
   assert.deepEqual(owners.slice(0, 6), ["Bradd", "Stone", "Bradd", "Stone", "Bradd", "Stone"]);
 });
 
-test("never binds hero visibility or animation time directly to scroll position", async () => {
-  const [app, css] = await Promise.all([
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/styles.css", root), "utf8"),
-  ]);
-
-  assert.doesNotMatch(app, /window\.scrollY\s*\/\s*transitionDistance/);
-  assert.doesNotMatch(app, /setHeroProgress/);
-  assert.doesNotMatch(app, /scrollTarget|progressRef|--hero-progress/);
-  assert.doesNotMatch(css, /\.hero-copy\s*\{[^}]*opacity:\s*calc/s);
-  assert.match(app, /const onWheel = \(event: WheelEvent\)/);
-  assert.match(app, /goToScene\(current \+ direction\)/);
-  assert.match(app, /touchend/);
-  assert.match(app, /PageDown/);
-  assert.match(app, /matchMedia\("\(max-width: 620px\)"\)/);
-});
-
-test("retargets every archive surface gracefully in either direction", async () => {
-  const canvas = await readFile(new URL("src/hero/HeroExperience.tsx", root), "utf8");
-
-  assert.match(canvas, /const target = POSES\[definition\.id\]\[scene\]/);
-  assert.match(canvas, /group\.position\.x = THREE\.MathUtils\.damp/);
-  assert.match(canvas, /group\.rotation\.y = THREE\.MathUtils\.damp/);
-  assert.match(canvas, /currentOpacity\.current = THREE\.MathUtils\.damp/);
-  assert.match(canvas, /clock\.elapsedTime/);
-  assert.doesNotMatch(canvas, /uProgress|scrollY|wheel/i);
-});
-
-test("guarantees an editorial fallback and an unblankable chapter cross-fade", async () => {
-  const [app, css] = await Promise.all([
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/styles.css", root), "utf8"),
-  ]);
-
-  assert.match(app, /className="archive-poster"/);
-  assert.match(app, /archive-poster-collect/);
-  assert.match(app, /archive-poster-grow/);
-  assert.match(app, /className="hero-running-promise"/);
-  assert.match(css, /\.hero-scene \{[^}]*transition: opacity \.55s ease, transform \.9s/s);
-  assert.match(css, /\.hero\[data-scene-index="0"\] \.hero-scene-proposition/);
-  assert.match(css, /\.hero\[data-enhanced="true"\] \.hero-cinematic \{ opacity: 1; \}/);
-  assert.match(css, /\.hero\[data-enhanced="true"\] \.archive-poster \{ opacity: 0; \}/);
-  assert.doesNotMatch(app, /data-phase/);
-  assert.doesNotMatch(css, /core \*=|scale\(3\.1\)|particle/i);
-});
-
 test("attributes self-reported figures and drops unconfirmed ones", async () => {
   const [app, content] = await Promise.all([
-    readFile(new URL("src/App.tsx", root), "utf8"),
-    readFile(new URL("src/content.ts", root), "utf8"),
+    source("src/App.tsx"),
+    source("src/content.ts"),
   ]);
-  const copy = `${app}
-${content}`;
+  const copy = `${app}\n${content}`;
 
-  // C09 is unresolved: the "over 250" figure is sourced to a different product line.
+  // C09: the public mask count is not confirmed for this exact Crayola scope.
   assert.doesNotMatch(copy, /250\+|more than 250|over 250/i);
-  // C05: the canonical scaling figure, in both the chips and the timeline.
+  // C05: canonical team scaling is four to 55+, never the earlier five-to-80 draft.
   assert.doesNotMatch(copy, /5 to 80|5 → 80/);
-  assert.match(content, /Teams from 4 to 55\+/);
   assert.match(content, /4 → 55\+/);
-  // C02: never sole credit for the raise.
+  // C02: the raise remains a team outcome, not sole credit.
   assert.doesNotMatch(copy, /\$40M\+/);
-  assert.match(content, /Team pitch behind a \$40M raise/);
-  // C07: canonical internal wording, with the source named.
-  assert.match(app, /at or near the top of Apple Arcade for 6\+ weeks/);
-  // C08: name the institution instead of implying a credential level.
+  assert.match(content, /team financing outcome reported at \$40M/i);
+  assert.match(content, /The raise was a team outcome/);
+  // C07: internal chart-performance language remains visibly qualified.
+  assert.match(app, /internal reporting says the game remained at or near the top of Apple Arcade for 6\+ weeks/);
+  // C08: name the faculty context without inventing a credential.
   assert.doesNotMatch(copy, /MFA-level/);
-  assert.match(content, /Game Design MFA faculty, LCAD/);
-  // C11: Stone's depth anchor, attributed.
+  assert.match(copy, /Game Design MFA faculty at LCAD/);
+  // C11: Stone's experience anchor remains attributed.
   assert.match(content, /28 years/);
   assert.match(content, /per his public résumé/);
-  // C15: a portfolio relationship, not a specific production credit.
+  // C15: portfolio relationships never become an unsupported production credit.
   assert.doesNotMatch(copy, /Batman: The Animated Series/);
-  // Self-reported production metrics carry their attribution into the dialog.
-  assert.match(content, /sourceNote\?: string;/);
+  // Self-reported evidence carries its attribution into the complete disclosure.
+  assert.match(content, /sourceNote\?: string/);
   assert.match(app, /detail\.sourceNote/);
 });

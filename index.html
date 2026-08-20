@@ -27,6 +27,21 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <style>
+        .no-script { min-height: 100vh; display: grid; align-content: center; gap: 22px; padding: clamp(28px, 7vw, 96px); background: #05070b; color: #f4f1e8; font-family: system-ui, sans-serif; }
+        .no-script small { color: #72e4ff; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+        .no-script h1 { max-width: 9ch; margin: 0; font-size: clamp(64px, 15vw, 150px); line-height: .78; letter-spacing: -.05em; }
+        .no-script p { max-width: 27ch; margin: 0; font-family: Georgia, serif; font-size: clamp(24px, 5vw, 44px); line-height: 1.08; }
+        .no-script a { width: fit-content; padding: 16px 20px; border: 1px solid #72e4ff; color: #f4f1e8; text-decoration: none; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      </style>
+      <main class="no-script">
+        <small>Creative leadership for games, brands &amp; entertainment</small>
+        <h1>BRADD + STONE</h1>
+        <p>We turn IP into worlds people can play, collect, and grow.</p>
+        <a href="mailto:bradd.mcbrearty@gmail.com">Start a conversation</a>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

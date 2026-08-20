@@ -89,8 +89,18 @@ describe("accessibility", () => {
       const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
       assert.equal(results.violations.length, 0, `\n${format(results.violations)}`);
 
+      for (let index = 0; index < 5; index += 1) {
+        await page.keyboard.press("Tab");
+        const focusIsInside = await page.evaluate(() => {
+          const openDialog = document.querySelector("dialog[open]");
+          return Boolean(openDialog?.contains(document.activeElement));
+        });
+        assert.equal(focusIsInside, true, `focus escaped the modal after ${index + 1} Tab presses`);
+      }
+
       await page.keyboard.press("Escape");
       await dialog.waitFor({ state: "hidden", timeout: 5000 });
+      assert.equal(await opener.evaluate((node) => node === document.activeElement), true, "focus did not return to the originating case card");
     } finally {
       await context.close();
     }
