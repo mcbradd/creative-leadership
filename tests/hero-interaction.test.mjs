@@ -25,51 +25,24 @@ describe("mobile-first executive one-pager interactions", () => {
     });
   }
 
-  test("four explicit chapter buttons select a complete opening argument", async () => {
+  test("opening teaser stays focused and links into the partnership", async () => {
     const { page, context } = await pageFor();
     try {
       const hero = page.locator(".hero");
-      const buttons = page.locator(".hero-scene-nav button");
-      assert.equal(await buttons.count(), 4);
-      assert.equal(await hero.getAttribute("data-scene"), "proposition");
+      assert.match((await hero.getByRole("heading", { level: 1 }).textContent()) ?? "", /We turn IP into worlds people can\s+play, collect, and grow\./);
+      assert.equal(await hero.locator('.hero-orbit[aria-hidden="true"]').count(), 1);
+      assert.equal(await hero.locator("img").count(), 0);
+      assert.equal(await hero.locator("button").count(), 0);
+      assert.equal(await hero.locator(".hero-scene-nav").count(), 0);
+      assert.equal(await hero.getAttribute("data-scene"), null);
+      assert.doesNotMatch((await hero.textContent()) ?? "", /Tetris|Apple Arcade|shipped together/i);
 
-      for (const [index, expected] of [
-        [0, ["proposition", "One accountable creative system."]],
-        [1, ["partnership", "Two leaders. Equal weight."]],
-        [2, ["translation", "Play. Collect. Grow."]],
-        [3, ["proof", "Already proven under pressure."]],
-      ]) {
-        await buttons.nth(index).click();
-        assert.equal(await hero.getAttribute("data-scene"), expected[0]);
-        assert.equal(await buttons.nth(index).getAttribute("aria-pressed"), "true");
-        assert.equal(await page.locator(".hero-art-caption strong").textContent(), expected[1]);
-      }
-    } finally {
-      await context.close();
-    }
-  });
-
-  test("chapter buttons support Arrow, Home, and End keyboard navigation", async () => {
-    const { page, context } = await pageFor();
-    try {
-      const hero = page.locator(".hero");
-      const buttons = page.locator(".hero-scene-nav button");
-      await buttons.nth(0).focus();
-
-      await page.keyboard.press("ArrowRight");
-      assert.equal(await hero.getAttribute("data-scene"), "partnership");
-      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), await buttons.nth(1).getAttribute("aria-label"));
-
-      await page.keyboard.press("ArrowDown");
-      assert.equal(await hero.getAttribute("data-scene"), "translation");
-      await page.keyboard.press("End");
-      assert.equal(await hero.getAttribute("data-scene"), "proof");
-      await page.keyboard.press("Home");
-      assert.equal(await hero.getAttribute("data-scene"), "proposition");
-      await page.keyboard.press("ArrowLeft");
-      assert.equal(await hero.getAttribute("data-scene"), "proof");
-      await page.keyboard.press("ArrowUp");
-      assert.equal(await hero.getAttribute("data-scene"), "translation");
+      const partnershipLink = hero.locator('a[href="#team"]');
+      assert.equal(await partnershipLink.count(), 1);
+      await partnershipLink.click();
+      await page.waitForFunction(() => window.location.hash === "#team");
+      assert.equal(await page.evaluate(() => window.location.hash), "#team");
+      assert.equal(await page.locator("#team .leader-card").count(), 2);
     } finally {
       await context.close();
     }
@@ -78,13 +51,13 @@ describe("mobile-first executive one-pager interactions", () => {
   test("wheel input scrolls the page instead of being captured by the hero", async () => {
     const { page, context } = await pageFor();
     try {
-      assert.equal(await page.locator(".hero").getAttribute("data-scene"), "proposition");
+      assert.equal(await page.locator(".hero").getAttribute("data-scene"), null);
       assert.equal(await page.evaluate(() => window.scrollY), 0);
       await page.mouse.move(195, 420);
       await page.mouse.wheel(0, 520);
       await page.waitForTimeout(250);
       assert.ok(await page.evaluate(() => window.scrollY > 100), "wheel input did not move the document");
-      assert.equal(await page.locator(".hero").getAttribute("data-scene"), "proposition");
+      assert.equal(await page.locator(".hero-scene-nav").count(), 0);
     } finally {
       await context.close();
     }
@@ -115,10 +88,12 @@ describe("mobile-first executive one-pager interactions", () => {
     }
   });
 
-  test("hero case affordance opens a complete, viewport-safe disclosure and restores focus", async () => {
+  test("later Tetris proof opens a complete, viewport-safe disclosure and restores focus", async () => {
     const { page, context } = await pageFor();
     try {
-      const opener = page.getByRole("button", { name: "Open the complete Tetris Beat joint case file" }).first();
+      await page.locator("#proof").scrollIntoViewIfNeeded();
+      const opener = page.locator("#proof").getByRole("button", { name: "Open the complete Tetris Beat joint case file" });
+      assert.equal(await opener.count(), 1);
       await opener.click();
       const dialog = page.locator(".detail-dialog[open]");
       await dialog.waitFor({ state: "visible" });
@@ -129,7 +104,9 @@ describe("mobile-first executive one-pager interactions", () => {
       for (const heading of ["01 / The situation", "02 / Why it matters", "03 / How we lead it", "04 / Evidence in context"]) {
         assert.equal(await dialog.getByRole("heading", { name: heading }).count(), 1);
       }
-      assert.match(await dialog.textContent(), /Attribution note/);
+      const dialogText = (await dialog.textContent()) ?? "";
+      assert.doesNotMatch(dialogText, /Attribution note/i);
+      assert.doesNotMatch(dialogText, /rather than independently audited product claims/i);
 
       const fits = await dialog.locator("[data-fit-check]").evaluate((node) => {
         const rect = node.getBoundingClientRect();

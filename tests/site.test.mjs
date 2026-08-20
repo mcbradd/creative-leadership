@@ -15,7 +15,6 @@ test("publishes a private-by-convention executive artifact with an immediate pro
   assert.match(html, /noindex, nofollow, noarchive/);
   assert.match(html, /Bradd \+ Stone — Creative Leadership/);
   assert.match(app, /We turn IP into worlds people can/);
-  assert.match(app, /One accountable team from first idea to market-ready experience\./);
   assert.match(app, /Not two résumés\.[\s\S]*One shipped result\./);
   assert.match(content, /two successful seed rounds totaling more than \$7M/i);
   assert.match(app, /<main id="main-content" tabIndex=\{-1\}>/);
@@ -47,30 +46,29 @@ test("uses a mobile-first responsive shell with safe dynamic overlays", async ()
   assert.doesNotMatch(css, /Inter Variable|Newsreader Variable|Arial Narrow|Aptos Narrow/);
 });
 
-test("exposes four explicit hero chapters without trapping wheel scrolling", async () => {
+test("keeps the intro as a distinct abstract teaser before partnership and proof", async () => {
   const app = await source("src/App.tsx");
-  const chapterBlock = app.split("const heroChapters = [")[1].split("] as const;")[0];
-  const ids = [...chapterBlock.matchAll(/id: "([^"]+)"/g)].map((match) => match[1]);
+  const hero = app.split("function HeroSection")[1].split("export default function App")[0];
 
-  assert.deepEqual(ids, ["proposition", "partnership", "translation", "proof"]);
-  assert.match(app, /className="hero-scene-nav"/);
-  assert.match(app, /aria-pressed=\{scene === chapter\.id\}/);
-  assert.match(app, /onClick=\{\(\) => setScene\(chapter\.id\)\}/);
-  assert.match(app, /onKeyDown=\{\(event\) => handleChapterKey\(event, index\)\}/);
-  assert.match(app, /event\.key === "ArrowRight" \|\| event\.key === "ArrowDown"/);
-  assert.match(app, /event\.key === "ArrowLeft" \|\| event\.key === "ArrowUp"/);
-  assert.match(app, /event\.key === "Home"/);
-  assert.match(app, /event\.key === "End"/);
+  assert.match(hero, /className="hero"/);
+  assert.match(hero, /We turn IP into worlds people can/);
+  assert.match(hero, /className="hero-orbit" aria-hidden="true"/);
+  assert.match(hero, /href="#team"/);
+  assert.doesNotMatch(hero, /<img|<button|LeaderCard|leaderInsights|jointInsights|Tetris|tetris-|heroChapters|hero-scene|data-scene|onOpenLeader|onOpenProof/);
+  assert.match(app, /<section className="team-section" id="team"/);
+  assert.match(app, /<section className="proof-section" id="proof"/);
+  assert.match(app, /Open the complete Tetris Beat joint case file/);
+  assert.doesNotMatch(app, /B\+S/);
   assert.doesNotMatch(app, /addEventListener\("wheel"|onWheel|WheelEvent/);
 });
 
-test("renders complete situation, contribution, evidence, relevance, and attribution disclosures", async () => {
+test("renders complete situation, contribution, evidence, and relevance without source-note UI", async () => {
   const [app, content] = await Promise.all([
     source("src/App.tsx"),
     source("src/content.ts"),
   ]);
 
-  for (const field of ["statement", "brief", "moves", "proof", "relevance", "sourceNote"]) {
+  for (const field of ["statement", "brief", "moves", "proof", "relevance"]) {
     assert.match(content, new RegExp(`${field}\\??: `), `content schema must expose ${field}`);
   }
   assert.match(content, /owner: "Bradd" \| "Stone" \| "Joint"/);
@@ -83,8 +81,7 @@ test("renders complete situation, contribution, evidence, relevance, and attribu
   assert.match(app, /detail\.moves\.map/);
   assert.match(app, /detail\.proof\.map/);
   assert.match(app, /04 \/ Evidence in context/);
-  assert.match(app, /detail\.sourceNote &&/);
-  assert.match(app, /Attribution note/);
+  assert.doesNotMatch(app, /detail\.sourceNote|Attribution note/);
 });
 
 test("uses real evidence imagery for every range lens and removes the abstract seed", async () => {
@@ -165,7 +162,4 @@ test("attributes self-reported figures and drops unconfirmed ones", async () => 
   assert.match(content, /per his public résumé/);
   // C15: portfolio relationships never become an unsupported production credit.
   assert.doesNotMatch(copy, /Batman: The Animated Series/);
-  // Self-reported evidence carries its attribution into the complete disclosure.
-  assert.match(content, /sourceNote\?: string/);
-  assert.match(app, /detail\.sourceNote/);
 });

@@ -8,7 +8,7 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
-import { HERO_SCENES, launch, openPage, showHeroScene } from "../scripts/lib/capture.mjs";
+import { launch, openPage } from "../scripts/lib/capture.mjs";
 import { startSite } from "../scripts/lib/site-server.mjs";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -53,18 +53,21 @@ describe("accessibility", () => {
     });
   }
 
-  test("hero stays accessible through every directed scene", async () => {
+  test("static teaser hero has no WCAG A/AA violations", async () => {
     const { page, context } = await openPage(browser, {
       url: url(),
       viewport: { width: 1440, height: 900 },
       fx: "motion",
     });
     try {
-      for (const scene of HERO_SCENES) {
-        await showHeroScene(page, scene);
-        const results = await new AxeBuilder({ page }).include(".hero").withTags(TAGS).analyze();
-        assert.equal(results.violations.length, 0, `scene ${scene}:\n${format(results.violations)}`);
-      }
+      const hero = page.locator(".hero");
+      await hero.waitFor({ state: "visible" });
+      assert.equal(await hero.getAttribute("data-static"), "true", "hero should expose its static rendering mode");
+      assert.equal(await hero.getAttribute("data-scene"), null, "static hero must not expose obsolete scene state");
+      assert.equal(await hero.locator(".hero-scene-nav").count(), 0, "static hero must not expose obsolete scene controls");
+
+      const results = await new AxeBuilder({ page }).include(".hero").withTags(TAGS).analyze();
+      assert.equal(results.violations.length, 0, `\n${format(results.violations)}`);
     } finally {
       await context.close();
     }
