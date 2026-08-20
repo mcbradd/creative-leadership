@@ -11,6 +11,7 @@ export function detectExperienceTier(): ExperienceTier {
 
   const requested = new URLSearchParams(window.location.search).get("fx");
   if (requested === "static" || requested === "motion") return requested;
+  const requestedCinematic = requested === "webgl" || requested === "webgpu";
 
   const navigatorSignals = navigator as NavigatorWithSignals;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -18,7 +19,7 @@ export function detectExperienceTier(): ExperienceTier {
     (navigatorSignals.deviceMemory !== undefined && navigatorSignals.deviceMemory < 4) ||
     (navigator.hardwareConcurrency !== undefined && navigator.hardwareConcurrency < 4);
 
-  if (reducedMotion || navigatorSignals.connection?.saveData || constrainedDevice) return "motion";
+  if (!requestedCinematic && (reducedMotion || navigatorSignals.connection?.saveData || constrainedDevice)) return "motion";
 
   const probe = document.createElement("canvas");
   const hasWebGL2 = Boolean(probe.getContext("webgl2", { powerPreference: "high-performance" }));

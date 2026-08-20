@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { LazyMotion, m, useReducedMotion } from "motion/react";
 import {
   capabilityInsights,
@@ -13,12 +13,33 @@ import {
 } from "./content";
 import { detectExperienceTier, type ExperienceTier } from "./experience";
 
-const ExperienceCanvas = lazy(() => import("./ExperienceCanvas"));
+const HeroExperience = lazy(() => import("./hero/HeroExperience"));
 const loadMotionFeatures = () => import("./motionFeatures").then((module) => module.default);
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const media = (file: string) => `${basePath}/media/${file}`;
 
 type Detail = (CaseStudy & { detailType: "case" }) | (Insight & { detailType: "insight" });
+
+type HeroLazyBoundaryProps = {
+  children: ReactNode;
+  onFailure: () => void;
+};
+
+class HeroLazyBoundary extends Component<HeroLazyBoundaryProps, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onFailure();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 function Reveal({ children, className = "", delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
   const reduceMotion = useReducedMotion();
@@ -158,68 +179,168 @@ function DetailDialog({ detail, onDismiss }: { detail: Detail | null; onDismiss:
   );
 }
 
+type HeroPhase = "poster" | "gravity" | "swelling" | "detonation" | "field" | "remnant" | "payoff";
+type HeroTarget = { x: number; y: number; size: number };
+
+function phaseForProgress(progress: number): HeroPhase {
+  if (progress < 0.14) return "poster";
+  if (progress < 0.32) return "gravity";
+  if (progress < 0.46) return "swelling";
+  if (progress < 0.55) return "detonation";
+  if (progress < 0.73) return "field";
+  if (progress < 0.87) return "remnant";
+  return "payoff";
+}
+
+function HeroSection({ tier }: { tier: ExperienceTier }) {
+  const heroRef = useRef<HTMLElement>(null);
+  const targetRef = useRef<HTMLSpanElement>(null);
+  const payoffHeadingRef = useRef<HTMLHeadingElement>(null);
+  const reduceMotion = useReducedMotion();
+  const [progress, setProgress] = useState(0);
+  const [target, setTarget] = useState<HeroTarget | null>(null);
+  const [cinematicReady, setCinematicReady] = useState(false);
+  const [cinematicFailed, setCinematicFailed] = useState(false);
+  const canRender = !reduceMotion && (tier === "webgl" || tier === "webgpu") && !cinematicFailed;
+  const phase = canRender ? phaseForProgress(progress) : "payoff";
+
+  const measureTarget = useCallback(() => {
+    const element = targetRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const viewportScale = Math.max(1, Math.min(window.innerWidth, window.innerHeight));
+    const next = {
+      x: (rect.left + rect.width / 2) / window.innerWidth,
+      y: (rect.top + rect.height / 2) / window.innerHeight,
+      size: Math.max(rect.width, rect.height) / viewportScale,
+    };
+    setTarget((current) => current && Math.abs(current.x - next.x) < 0.001 && Math.abs(current.y - next.y) < 0.001 && Math.abs(current.size - next.size) < 0.001 ? current : next);
+  }, []);
+
+  useLayoutEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    let animationFrame = 0;
+    const update = () => {
+      animationFrame = 0;
+      const rect = hero.getBoundingClientRect();
+      const travel = Math.max(1, rect.height - window.innerHeight);
+      const next = Math.max(0, Math.min(1, -rect.top / travel));
+      setProgress((current) => Math.abs(current - next) > 0.001 ? next : current);
+      measureTarget();
+    };
+    const requestUpdate = () => {
+      if (!animationFrame) animationFrame = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+    window.addEventListener("pageshow", requestUpdate);
+    return () => {
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+      window.removeEventListener("pageshow", requestUpdate);
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [measureTarget]);
+
+  const skipCinematic = () => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const rect = hero.getBoundingClientRect();
+    const heroTop = window.scrollY + rect.top;
+    const travel = Math.max(0, hero.offsetHeight - window.innerHeight);
+    window.scrollTo({ top: heroTop + travel * 0.99, behavior: "instant" });
+    requestAnimationFrame(() => requestAnimationFrame(() => payoffHeadingRef.current?.focus({ preventScroll: true })));
+  };
+
+  return (
+    <section
+      className="hero"
+      id="top"
+      ref={heroRef}
+      data-phase={phase}
+      data-enhanced={cinematicReady}
+      data-static={!canRender}
+      style={{ "--hero-progress": progress } as CSSProperties}
+    >
+      <div className="hero-stage">
+        <div className="hero-orbit-static" aria-hidden="true"><span /><i /></div>
+        {canRender && (
+          <div className="hero-cinematic" aria-hidden="true">
+            <HeroLazyBoundary
+              onFailure={() => {
+                setCinematicReady(false);
+                setCinematicFailed(true);
+              }}
+            >
+              <Suspense fallback={null}>
+                <HeroExperience
+                  progress={progress}
+                  target={target}
+                  onReady={() => setCinematicReady(true)}
+                  onFailure={() => {
+                    setCinematicReady(false);
+                    setCinematicFailed(true);
+                  }}
+                />
+              </Suspense>
+            </HeroLazyBoundary>
+          </div>
+        )}
+
+        <p className="hero-identity">BRADD + STONE <span>／</span> CREATIVE LEADERSHIP</p>
+        <p className="sr-only">Bradd McBrearty and Stone Perales unite creative direction and art direction around one center of gravity. Together, they turn potential into coherent worlds designed to play, collect, and grow.</p>
+
+        <div className="hero-copy hero-poster" aria-hidden="true">
+          <p className="eyebrow">Creative leadership for games, brands &amp; entertainment</p>
+          <p className="hero-poster-name">BRADD <span>+</span> STONE</p>
+          <p className="hero-poster-thesis">Two disciplines. One center of gravity.</p>
+        </div>
+
+        <div className="hero-chapter hero-gravity" aria-hidden="true">
+          <span>01 / GRAVITY</span><p>Two disciplines.<br /><em>One field.</em></p>
+        </div>
+        <div className="hero-chapter hero-swelling" aria-hidden="true">
+          <span>02 / CREATIVE PRESSURE</span><p>Direction turns<br />potential into <em>energy.</em></p>
+        </div>
+        <div className="hero-chapter hero-field" aria-hidden="true">
+          <span>03 / THE POSSIBILITY FIELD</span><p>One idea.<br /><em>Every surface.</em></p>
+          <small>PLAY <i /> COLLECT <i /> GROW</small>
+        </div>
+        <div className="hero-chapter hero-remnant" aria-hidden="true">
+          <span>04 / THE CENTER</span><p>A world becomes real<br />when everything <em>belongs.</em></p>
+        </div>
+
+        <div className="hero-copy hero-payoff">
+          <p className="hero-payoff-lead" aria-hidden="true">WE TURN IP INTO</p>
+          <h1 ref={payoffHeadingRef} tabIndex={-1} aria-label="We turn IP into worlds people can play, collect, and grow.">W<span ref={targetRef} className="remnant-o">O</span>RLDS</h1>
+          <p className="hero-payoff-tail" aria-hidden="true">PEOPLE CAN <em>PLAY, COLLECT, AND GROW.</em></p>
+          <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="text-link" href="#team" tabIndex={phase === "payoff" ? undefined : -1}>Meet the partnership <span aria-hidden="true">↘</span></a></div>
+        </div>
+
+        <div className="hero-scroll-cue" aria-hidden="true"><span>{phase === "payoff" ? "CONTINUE" : "SCROLL TO BUILD THE WORLD"}</span><i /></div>
+        {canRender && phase !== "payoff" && <button className="hero-skip" type="button" onClick={skipCinematic}>Skip cinematic <span aria-hidden="true">↘</span></button>}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [activeRange, setActiveRange] = useState<"play" | "collect" | "grow">("play");
   const [activePartner, setActivePartner] = useState(partners[0]);
   const [tier] = useState<ExperienceTier>(() => detectExperienceTier());
-  const [pageVisible, setPageVisible] = useState(true);
-  const [heroProgress, setHeroProgress] = useState(0);
-  const [cinematicReady, setCinematicReady] = useState(false);
-  const [cinematicFailed, setCinematicFailed] = useState(false);
-
-  useEffect(() => {
-    const onVisibility = () => {
-      const visible = !document.hidden;
-      setPageVisible(visible);
-      if (!visible) setCinematicReady(false);
-    };
-    let animationFrame = 0;
-    const updateHeroProgress = () => {
-      animationFrame = 0;
-      const hero = document.getElementById("top");
-      if (!hero) return;
-      const transitionDistance = Math.max(1, hero.offsetHeight - window.innerHeight);
-      const progress = Math.max(0, Math.min(1.2, window.scrollY / transitionDistance));
-      setHeroProgress((current) => Math.abs(current - progress) > 0.002 ? progress : current);
-      if (progress >= 1.16) setCinematicReady(false);
-    };
-    const requestHeroProgress = () => {
-      if (animationFrame) return;
-      animationFrame = requestAnimationFrame(updateHeroProgress);
-    };
-
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("scroll", requestHeroProgress, { passive: true });
-    window.addEventListener("resize", requestHeroProgress);
-    animationFrame = requestAnimationFrame(updateHeroProgress);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("scroll", requestHeroProgress);
-      window.removeEventListener("resize", requestHeroProgress);
-      cancelAnimationFrame(animationFrame);
-    };
-  }, []);
 
   const openInsight = (insight: Insight) => setDetail({ ...insight, detailType: "insight" });
   const openStudy = (study: CaseStudy) => setDetail({ ...study, detailType: "case" });
   const range = rangeInsights.find((item) => item.id === activeRange) ?? rangeInsights[0];
-  const collapse = Math.max(0, Math.min(1, (heroProgress - 0.68) / 0.28));
-  const wipe = Math.max(0, Math.min(1, (heroProgress - 0.84) / 0.13));
-  const release = heroProgress <= 1 ? 1 : Math.max(0, 1 - (heroProgress - 1) / 0.16);
-  const heroStyle = { "--hero-collapse": collapse } as CSSProperties;
-  const collapseStyle = {
-    "--wipe-radius": `${wipe * 132}vmax`,
-    "--wipe-opacity": wipe > 0 ? release : 0,
-  } as CSSProperties;
 
   return (
     <LazyMotion features={loadMotionFeatures} strict>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <div className="ambient" aria-hidden="true" />
-      {(tier === "webgl" || tier === "webgpu") && !cinematicFailed && pageVisible && heroProgress < 1.16 && <Suspense fallback={null}><ExperienceCanvas collapseProgress={collapse} onReady={() => setCinematicReady(true)} onFailure={() => { setCinematicReady(false); setCinematicFailed(true); }} tier={tier} /></Suspense>}
-      <div className="reality-collapse" style={collapseStyle} aria-hidden="true" />
       <div className="scroll-progress" aria-hidden="true"><span /></div>
 
       <header className="topbar">
@@ -228,18 +349,9 @@ export default function App() {
         <a className="top-cta" href="#contact">Build what&apos;s next <span aria-hidden="true">↘</span></a>
       </header>
 
-      <main id="main-content">
-        <section className="hero" id="top" style={heroStyle} data-enhanced={cinematicReady}>
-          <div className="hero-stage">
-            <div className="hero-orbit-fallback" aria-hidden="true"><span /><i /><b /></div>
-            <div className="hero-copy">
-              <p className="eyebrow">Two disciplines. One leadership system.</p>
-              <h1>We turn IP into worlds people can <em>play, collect, and grow.</em></h1>
-              <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="text-link" href="#team">Meet the partnership <span aria-hidden="true">↘</span></a></div>
-            </div>
-            <nav className="signal-strip" aria-label="Explore leadership capabilities">{capabilityInsights.map((insight) => <button key={insight.id} type="button" onClick={() => openInsight(insight)}>{insight.title}<span aria-hidden="true">↗</span></button>)}</nav>
-          </div>
-        </section>
+      <main id="main-content" tabIndex={-1}>
+        <HeroSection tier={tier} />
+        <nav className="signal-strip" aria-label="Explore leadership capabilities">{capabilityInsights.map((insight) => <button key={insight.id} type="button" onClick={() => openInsight(insight)}>{insight.title}<span aria-hidden="true">↗</span></button>)}</nav>
 
         <section className="team-section" id="team">
           <Reveal className="section-intro"><p className="section-index">01 / The partnership</p><h2>Vision with a way through.</h2><p>Stone makes a world coherent, ownable, and unmistakable. Bradd makes it playable, scalable, and commercially real.</p></Reveal>

@@ -18,6 +18,7 @@ test("publishes a private-by-convention executive artifact", async () => {
   assert.match(app, /We build people who build worlds\./);
   assert.match(content, /Two successful funding rounds/);
   assert.match(app, /aria-modal="true"/);
+  assert.match(app, /<main id="main-content" tabIndex=\{-1\}>/);
 });
 
 test("does not expose private opportunity language", async () => {
@@ -65,17 +66,23 @@ test("ships a progressively enhanced single-canvas experience", async () => {
   const [app, experience, canvas] = await Promise.all([
     readFile(new URL("src/App.tsx", root), "utf8"),
     readFile(new URL("src/experience.ts", root), "utf8"),
-    readFile(new URL("src/ExperienceCanvas.tsx", root), "utf8"),
+    readFile(new URL("src/hero/HeroExperience.tsx", root), "utf8"),
   ]);
 
-  assert.match(app, /lazy\(\(\) => import\("\.\/ExperienceCanvas"\)\)/);
+  assert.match(app, /lazy\(\(\) => import\("\.\/hero\/HeroExperience"\)\)/);
   assert.match(experience, /"static" \| "motion" \| "webgl" \| "webgpu"/);
   assert.match(experience, /saveData/);
+  assert.match(experience, /requestedCinematic/);
   assert.match(canvas, /frameloop="demand"/);
   assert.match(canvas, /powerPreference: "high-performance"/);
-  assert.match(canvas, /collapseProgress/);
+  assert.match(canvas, /progress/);
+  assert.match(canvas, /target/);
   assert.match(canvas, /fragmentShader/);
-  assert.doesNotMatch(canvas, /ParticleResolve|<points|WorldSeed/);
+  assert.doesNotMatch(canvas, /ParticleResolve|WorldSeed/);
+  assert.match(app, /class HeroLazyBoundary/);
+  assert.match(canvas, /gl\.debug\.onShaderError/);
+  assert.match(canvas, /<FirstFrameReady/);
+  assert.doesNotMatch(canvas, /gl\.compile\(scene, camera\)/);
 });
 
 test("keeps representation balanced in the featured case sequence", async () => {
@@ -83,4 +90,26 @@ test("keeps representation balanced in the featured case sequence", async () => 
   const caseBlock = content.split("export const caseStudies")[1].split("export const partners")[0];
   const owners = [...caseBlock.matchAll(/owner: "(Bradd|Stone)"/g)].map((match) => match[1]);
   assert.deepEqual(owners.slice(0, 6), ["Bradd", "Stone", "Bradd", "Stone", "Bradd", "Stone"]);
+});
+
+test("never derives hero-copy visibility from a restored scroll offset", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("src/App.tsx", root), "utf8"),
+    readFile(new URL("src/styles.css", root), "utf8"),
+  ]);
+
+  assert.doesNotMatch(app, /window\.scrollY\s*\/\s*transitionDistance/);
+  assert.doesNotMatch(app, /setHeroProgress/);
+  assert.doesNotMatch(css, /\.hero-copy\s*\{[^}]*opacity:\s*calc/s);
+});
+
+test("drives the live shader materials instead of detached uniform descriptors", async () => {
+  const canvas = await readFile(new URL("src/hero/HeroExperience.tsx", root), "utf8");
+
+  assert.match(canvas, /particles\.current\.uniforms\.uProgress\.value/);
+  assert.match(canvas, /backdrop\.current\.uniforms\.uProgress\.value/);
+  assert.match(canvas, /remnant\.current\.uniforms\.uProgress\.value/);
+  assert.match(canvas, /remnant\.current\.uniforms\.uAccretionMap\.value/);
+  assert.match(canvas, /float gravity = smoothstep\(0\.14, 0\.32, uProgress\);/);
+  assert.match(canvas, /const remnantUniforms = useMemo[\s\S]*?\[emptyTexture\],\n\s*\);/);
 });
