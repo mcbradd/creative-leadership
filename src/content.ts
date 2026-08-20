@@ -11,6 +11,8 @@ export type CaseStudy = {
   brief: string;
   moves: string[];
   proof: string[];
+  /** Attribution shown with the proof chips when the figures are self-reported. */
+  sourceNote?: string;
 };
 
 export type Insight = {
@@ -55,7 +57,7 @@ export const capabilityInsights: Insight[] = [
     statement: "A great visual language remains recognizable across artists, formats, and years.",
     brief: "We build systems—not isolated key art—so every UI state, card, collectible, environment, and marketing surface feels like it belongs to the same world.",
     moves: ["Establish shape, color, material, and motion logic", "Build modular templates for many contributors", "Create review standards that protect quality at scale"],
-    proof: ["Chaotic", "Batman: The Animated Series", "Court of the Dead", "Tetris Beat"],
+    proof: ["Chaotic", "Warner Bros. / DC", "Court of the Dead", "Tetris Beat"],
   },
   {
     id: "product-strategy",
@@ -64,7 +66,7 @@ export const capabilityInsights: Insight[] = [
     statement: "We help the strongest idea survive contact with schedule, platform, licensing, and market reality.",
     brief: "That means shaping the pitch, sequencing the product, defining the content architecture, and choosing where to invest so a launch can become an expandable business.",
     moves: ["Clarify the audience and commercial thesis", "Map one IP across physical and digital surfaces", "Build credible production and investment narratives"],
-    proof: ["Two funding rounds", "$40M+ investment narrative", "Multi-league licensing", "Live-ops planning"],
+    proof: ["Two funding rounds", "Team pitch behind a $40M raise", "Multi-league licensing", "Live-ops planning"],
   },
   {
     id: "team-building",
@@ -73,7 +75,7 @@ export const capabilityInsights: Insight[] = [
     statement: "Creative leadership becomes real in the decisions a team can make without waiting for permission.",
     brief: "We create shared language, useful constraints, healthy critique, and production clarity across art, design, engineering, brand, and external partners.",
     moves: ["Align disciplines around one visible quality target", "Mentor leads and remove structural friction", "Scale culture and process with the work"],
-    proof: ["Teams from 5 to 80", "Global art teams of 40–200+", "Teaching + mentorship", "At-risk production recovery"],
+    proof: ["Teams from 4 to 55+", "Global art teams of 40–200+", "Teaching + mentorship", "At-risk production recovery"],
   },
 ];
 
@@ -85,7 +87,7 @@ export const leaderInsights: Record<"bradd" | "stone", Insight> = {
     statement: "He builds the bridge between an ambitious idea and the team, technology, and product logic required to ship it.",
     brief: "Bradd combines creative direction, game design, technical fluency, production recovery, product strategy, and executive communication—especially where a project needs a credible path through uncertainty.",
     moves: ["Turn audience fantasy into a playable product thesis", "Connect creative standards to practical production systems", "Build teams and investment narratives around visible proof"],
-    proof: ["15+ years across games and entertainment", "Teams from 5 to 80", "Two successful funding rounds", "MFA-level teaching + mentorship"],
+    proof: ["15+ years across games and entertainment", "Teams from 4 to 55+", "Two successful funding rounds", "Game Design MFA faculty, LCAD"],
   },
   stone: {
     id: "stone-profile",
@@ -124,7 +126,7 @@ export const rangeInsights: Insight[] = [
     statement: "We design the creative operating system that lets an IP expand without becoming generic.",
     brief: "Franchise logic, pipelines, design bibles, content architecture, and team development create the conditions for growth across products and generations.",
     moves: ["Franchise and style-guide systems", "Scalable art and production pipelines", "Talent development and partner alignment"],
-    proof: ["Disney pipeline +60%", "Chaotic transmedia system", "Tetris Beat live levels", "Global production teams"],
+    proof: ["~60% faster Disney animation", "Chaotic transmedia system", "Tetris Beat live levels", "Global production teams"],
   },
 ];
 
@@ -141,7 +143,8 @@ export const caseStudies: CaseStudy[] = [
     statement: "One sports universe. Every league in play.",
     brief: "Translate a rare multi-league licensing opportunity into an ownable game universe—then make the idea tangible enough for partners, investors, and players to feel it.",
     moves: ["Defined the creative and gameplay vision across franchise, product, and pitch surfaces.", "Built playable controller prototypes for an executive working session with Apple.", "Aligned an expanding distributed team around a shared game-feel target."],
-    proof: ["Multi-league IP system", "$40M+ studio investment narrative", "Team scaled from 4 to 55+"],
+    proof: ["Multi-league IP system", "Team pitch behind a $40M raise", "Team scaled from 4 to 55+"],
+    sourceNote: "The raise was a team outcome; Bradd pitched and contributed to it.",
   },
   {
     id: "chaotic",
@@ -167,7 +170,8 @@ export const caseStudies: CaseStudy[] = [
     statement: "A beloved world needs a production system worthy of it.",
     brief: "Increase the velocity and consistency of a character-heavy Disney experience without flattening the personality that makes the IP matter.",
     moves: ["Redesigned the art and animation pipeline around clearer handoffs and reusable systems.", "Connected creative standards directly to technical constraints and team practice.", "Built a structure that let artists spend more time on performance and less on repetition."],
-    proof: ["60% pipeline acceleration", "200+ minutes of animation", "60+ character rigs"],
+    proof: ["~60% faster animation production", "200+ minutes of animation", "60+ character rigs"],
+    sourceNote: "Production figures are internal, self-reported career metrics.",
   },
   {
     id: "warner",
@@ -181,7 +185,7 @@ export const caseStudies: CaseStudy[] = [
     statement: "Make heritage IP feel current without losing its center.",
     brief: "Create adaptable style systems for globally recognized characters across trading cards, collectibles, animation art, and consumer products.",
     moves: ["Built modular visual languages that remain recognizable across artists and formats.", "Balanced licensor stewardship, audience expectations, and product-level originality.", "Guided art from early direction through production-ready execution."],
-    proof: ["Batman + Harley Quinn", "Looney Tunes + Scooby-Doo", "Cards + collectibles + cel art"],
+    proof: ["DC character style systems", "Trading cards + collectibles", "Direction through production art"],
   },
   {
     id: "emerging",
@@ -195,7 +199,8 @@ export const caseStudies: CaseStudy[] = [
     statement: "Use new technology to expand taste—not replace it.",
     brief: "Build practical, rights-cleared production approaches for Roblox-scale content and other fast-moving formats while protecting the human judgment at the center of the work.",
     moves: ["Designed production systems that connect creative intent, tool choice, and legal clarity.", "Mentored cross-disciplinary teams through unfamiliar technical and aesthetic territory.", "Turned experiments into repeatable workflows instead of isolated demos."],
-    proof: ["2×+ output in tested workflows", "Rights-cleared approach", "Global team enablement"],
+    proof: ["More than doubled contributor output", "Rights-cleared approach", "Global team enablement"],
+    sourceNote: "Output figure is an internal measurement from tested workflows.",
   },
   {
     id: "court",
@@ -223,7 +228,7 @@ export const partners: Partner[] = [
   { name: "Xbox", category: "Platform", note: "Console products and platform-facing creative work." },
   { name: "Roblox", category: "Platform", note: "Fast-moving interactive production and responsible new workflows." },
   { name: "EA", category: "Entertainment", note: "Games and entertainment production experience." },
-  { name: "Crayola", category: "Product", note: "A physical-to-digital play experience with 250+ masks." },
+  { name: "Crayola", category: "Product", note: "Physical coloring scanned into animated, wearable virtual masks." },
   { name: "Toyota", category: "Product", note: "North American brand identity and visual direction." },
   { name: "Nickelodeon", category: "Entertainment", note: "Character-driven entertainment and licensed worlds." },
   { name: "SpongeBob", category: "Franchise", note: "Audience-first stewardship of a globally loved character world." },
@@ -234,10 +239,10 @@ export const partners: Partner[] = [
 export const depthTimeline = [
   {
     bradd: { label: "PLAYABLE PROOF", value: "15+ years", note: "Games, entertainment, and interactive products" },
-    stone: { label: "VISUAL WORLDS", value: "Original + licensed", note: "Franchise systems across screens and shelves" },
+    stone: { label: "INDUSTRY DEPTH", value: "28 years", note: "Games, comics, collectibles, and animation, per his public résumé" },
   },
   {
-    bradd: { label: "TEAM SYSTEMS", value: "5 → 80", note: "Creative, technical, and production leadership" },
+    bradd: { label: "TEAM SYSTEMS", value: "4 → 55+", note: "Plus roughly 30 external vendors" },
     stone: { label: "GLOBAL DIRECTION", value: "40 → 200+", note: "Contributors aligned around one visual grammar" },
   },
   {

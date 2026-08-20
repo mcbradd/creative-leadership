@@ -12,6 +12,7 @@ import {
   type Insight,
 } from "./content";
 import { detectExperienceTier, type ExperienceTier } from "./experience";
+import { CHAPTERS, NARRATIVE_LAMBDA, chapterWeights, damp, phaseAt, type ChapterId } from "./hero/director";
 
 const HeroExperience = lazy(() => import("./hero/HeroExperience"));
 const loadMotionFeatures = () => import("./motionFeatures").then((module) => module.default);
@@ -170,7 +171,7 @@ function DetailDialog({ detail, onDismiss }: { detail: Detail | null; onDismiss:
             <p className="dialog-brief">{detail.brief}</p>
             <div className="dialog-columns">
               <div><h3>{detail.detailType === "case" ? "The creative moves" : "How we lead it"}</h3><ul>{detail.moves.map((move) => <li key={move}>{move}</li>)}</ul></div>
-              <div><h3>{detail.detailType === "case" ? "Proof in the work" : "Evidence"}</h3><ul className="proof-list">{detail.proof.map((proof) => <li key={proof}>{proof}</li>)}</ul></div>
+              <div><h3>{detail.detailType === "case" ? "Proof in the work" : "Evidence"}</h3><ul className="proof-list">{detail.proof.map((proof) => <li key={proof}>{proof}</li>)}</ul>{detail.detailType === "case" && detail.sourceNote && <p className="proof-source">{detail.sourceNote}</p>}</div>
             </div>
           </div>
         </article>
@@ -179,30 +180,26 @@ function DetailDialog({ detail, onDismiss }: { detail: Detail | null; onDismiss:
   );
 }
 
-type HeroPhase = "poster" | "gravity" | "swelling" | "detonation" | "field" | "remnant" | "payoff";
 type HeroTarget = { x: number; y: number; size: number };
 
-function phaseForProgress(progress: number): HeroPhase {
-  if (progress < 0.14) return "poster";
-  if (progress < 0.32) return "gravity";
-  if (progress < 0.46) return "swelling";
-  if (progress < 0.55) return "detonation";
-  if (progress < 0.73) return "field";
-  if (progress < 0.87) return "remnant";
-  return "payoff";
-}
+const CHAPTER_IDS = CHAPTERS.map((chapter) => chapter.id);
 
 function HeroSection({ tier }: { tier: ExperienceTier }) {
   const heroRef = useRef<HTMLElement>(null);
   const targetRef = useRef<HTMLSpanElement>(null);
   const payoffHeadingRef = useRef<HTMLHeadingElement>(null);
   const reduceMotion = useReducedMotion();
-  const [progress, setProgress] = useState(0);
+  /** Raw scroll-derived value. Shared with the WebGL layer, which damps its own copy. */
+  const scrollTarget = useRef(0);
+  /** The damped value the DOM actually renders. */
+  const narrative = useRef(0);
+  const [phase, setPhase] = useState<ChapterId>("poster");
   const [target, setTarget] = useState<HeroTarget | null>(null);
   const [cinematicReady, setCinematicReady] = useState(false);
   const [cinematicFailed, setCinematicFailed] = useState(false);
+  const [onScreen, setOnScreen] = useState(true);
   const canRender = !reduceMotion && (tier === "webgl" || tier === "webgpu") && !cinematicFailed;
-  const phase = canRender ? phaseForProgress(progress) : "payoff";
+  const activePhase: ChapterId = canRender ? phase : "payoff";
 
   const measureTarget = useCallback(() => {
     const element = targetRef.current;
@@ -221,29 +218,72 @@ function HeroSection({ tier }: { tier: ExperienceTier }) {
     const hero = heroRef.current;
     if (!hero) return;
     let animationFrame = 0;
-    const update = () => {
-      animationFrame = 0;
+    let lastTimestamp = 0;
+    let lastPhase: ChapterId = phaseAt(0);
+    const lambda = reduceMotion ? Number.POSITIVE_INFINITY : NARRATIVE_LAMBDA;
+
+    // Never derived from window.scrollY: back-navigation restores the offset before
+    // layout settles, which used to snap the hero to the wrong chapter.
+    const readScroll = () => {
       const rect = hero.getBoundingClientRect();
       const travel = Math.max(1, rect.height - window.innerHeight);
-      const next = Math.max(0, Math.min(1, -rect.top / travel));
-      setProgress((current) => Math.abs(current - next) > 0.001 ? next : current);
-      measureTarget();
-    };
-    const requestUpdate = () => {
-      if (!animationFrame) animationFrame = requestAnimationFrame(update);
+      scrollTarget.current = Math.max(0, Math.min(1, -rect.top / travel));
     };
 
-    update();
-    window.addEventListener("scroll", requestUpdate, { passive: true });
-    window.addEventListener("resize", requestUpdate);
-    window.addEventListener("pageshow", requestUpdate);
+    // Written as custom properties rather than React state: this runs every frame,
+    // and the phase attribute is the only part that changes rarely enough to render.
+    const write = (value: number) => {
+      hero.style.setProperty("--hero-progress", value.toFixed(4));
+      const weights = chapterWeights(value);
+      for (const id of CHAPTER_IDS) hero.style.setProperty(`--w-${id}`, weights[id].toFixed(4));
+      const next = phaseAt(value);
+      if (next !== lastPhase) {
+        lastPhase = next;
+        setPhase(next);
+      }
+    };
+
+    const tick = (timestamp: number) => {
+      const dt = lastTimestamp ? Math.min(0.05, (timestamp - lastTimestamp) / 1000) : 1 / 60;
+      lastTimestamp = timestamp;
+      readScroll();
+      narrative.current = damp(narrative.current, scrollTarget.current, lambda, dt);
+      write(narrative.current);
+      measureTarget();
+      // The loop idles once the copy has caught up, so a still page costs nothing.
+      const settled = Math.abs(narrative.current - scrollTarget.current) < 0.0002;
+      animationFrame = settled ? 0 : requestAnimationFrame(tick);
+    };
+
+    const wake = () => {
+      if (animationFrame) return;
+      lastTimestamp = 0;
+      animationFrame = requestAnimationFrame(tick);
+    };
+
+    readScroll();
+    narrative.current = scrollTarget.current;
+    write(narrative.current);
+    measureTarget();
+
+    window.addEventListener("scroll", wake, { passive: true });
+    window.addEventListener("resize", wake);
+    window.addEventListener("pageshow", wake);
     return () => {
-      window.removeEventListener("scroll", requestUpdate);
-      window.removeEventListener("resize", requestUpdate);
-      window.removeEventListener("pageshow", requestUpdate);
+      window.removeEventListener("scroll", wake);
+      window.removeEventListener("resize", wake);
+      window.removeEventListener("pageshow", wake);
       cancelAnimationFrame(animationFrame);
     };
-  }, [measureTarget]);
+  }, [measureTarget, reduceMotion]);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setOnScreen(entry.isIntersecting), { rootMargin: "10%" });
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, []);
 
   const skipCinematic = () => {
     const hero = heroRef.current;
@@ -260,10 +300,9 @@ function HeroSection({ tier }: { tier: ExperienceTier }) {
       className="hero"
       id="top"
       ref={heroRef}
-      data-phase={phase}
+      data-phase={activePhase}
       data-enhanced={cinematicReady}
       data-static={!canRender}
-      style={{ "--hero-progress": progress } as CSSProperties}
     >
       <div className="hero-stage">
         <div className="hero-orbit-static" aria-hidden="true"><span /><i /></div>
@@ -277,7 +316,8 @@ function HeroSection({ tier }: { tier: ExperienceTier }) {
             >
               <Suspense fallback={null}>
                 <HeroExperience
-                  progress={progress}
+                  active={onScreen}
+                  progressRef={scrollTarget}
                   target={target}
                   onReady={() => setCinematicReady(true)}
                   onFailure={() => {
@@ -320,8 +360,8 @@ function HeroSection({ tier }: { tier: ExperienceTier }) {
           <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="text-link" href="#team" tabIndex={phase === "payoff" ? undefined : -1}>Meet the partnership <span aria-hidden="true">↘</span></a></div>
         </div>
 
-        <div className="hero-scroll-cue" aria-hidden="true"><span>{phase === "payoff" ? "CONTINUE" : "SCROLL TO BUILD THE WORLD"}</span><i /></div>
-        {canRender && phase !== "payoff" && <button className="hero-skip" type="button" onClick={skipCinematic}>Skip cinematic <span aria-hidden="true">↘</span></button>}
+        <div className="hero-scroll-cue" aria-hidden="true"><span>{activePhase === "payoff" ? "CONTINUE" : "SCROLL TO BUILD THE WORLD"}</span><i /></div>
+        {canRender && activePhase !== "payoff" && <button className="hero-skip" type="button" onClick={skipCinematic}>Skip cinematic <span aria-hidden="true">↘</span></button>}
       </div>
     </section>
   );
@@ -369,7 +409,7 @@ export default function App() {
             <p className="section-index">02 / Proven together</p><p className="project-kicker">Apple Arcade · Tetris Beat</p><h2>Not two résumés. One shipped result.</h2>
             <p>An at-risk production needed one coherent creative and production system. Stone established its visual language and led the art vision. Bradd rebuilt the technical framework and production path. Together with the wider team, they turned fragmented work into a scalable, released game.</p>
             <div className="production-build" aria-label="Tetris Beat production transformation">{["5 DAYS", "20+ ARTISTS", "28 LIVE LEVELS"].map((label, index) => <div className="build-stage" key={label}><span>{String(index + 1).padStart(2, "0")}</span><strong>{label}</strong><i aria-hidden="true">{Array.from({ length: index === 0 ? 5 : index === 1 ? 12 : 18 }, (_, cell) => <b key={cell} />)}</i></div>)}</div>
-            <p className="proof-footnote">Shipped eight months later and ranked near the top of Apple Arcade for weeks.</p>
+            <p className="proof-footnote">Shipped eight months later and held at or near the top of Apple Arcade for 6+ weeks. Internal production record.</p>
           </Reveal>
         </section>
 
@@ -403,9 +443,9 @@ export default function App() {
             <img className="crayola-main" src={media("crayola-funny-faces-front.webp")} alt="Crayola Funny Faces Crazy Costumes product showing a virtual mask in use" width="1138" height="1480" loading="lazy" />
             <div className="mask-mosaic" aria-hidden="true">{Array.from({ length: 30 }, (_, index) => <i key={index} style={{ "--tile": index } as CSSProperties} />)}</div>
             <div className="crayola-inset"><img src={media("crayola-funny-faces-back.webp")} alt="Children mixing and wearing Crayola Color Alive virtual masks" width="1138" height="1480" loading="lazy" /></div>
-            <span className="mask-count">250+<small>VIRTUAL MASKS</small></span>
+            <span className="mask-count">LIVE<small>WEARABLE MASKS</small></span>
           </Reveal>
-          <Reveal className="collab-copy" delay={0.08}><p className="section-index">06 / Physical becomes interactive</p><p className="project-kicker">Crayola Color Alive · Funny Faces—Crazy Costumes</p><h2>When the obvious route did not work, we made a new one.</h2><p>For this contract engagement, Stone translated supplied character assets into an interactive-ready art system. Bradd built the technical backbone for rigging, animation, and real-time behavior. Physical coloring became a playful app experience with more than 250 virtual masks.</p><div className="role-pair"><p><b>STONE</b> art adaptation + visual continuity</p><p><b>BRADD</b> technical implementation + animation systems</p></div></Reveal>
+          <Reveal className="collab-copy" delay={0.08}><p className="section-index">06 / Physical becomes interactive</p><p className="project-kicker">Crayola Color Alive · Funny Faces—Crazy Costumes</p><h2>When the obvious route did not work, we made a new one.</h2><p>For this contract engagement, Stone translated supplied character assets into an interactive-ready art system. Bradd built the technical backbone for rigging, animation, and real-time behavior. Physical coloring became a playful app experience of scanned, animated, wearable virtual masks.</p><div className="role-pair"><p><b>STONE</b> art adaptation + visual continuity</p><p><b>BRADD</b> technical implementation + animation systems</p></div></Reveal>
         </section>
 
         <section className="depth-section" id="depth">
@@ -419,7 +459,7 @@ export default function App() {
 
         <section className="mentorship-section" id="mentorship">
           <div className="mentorship-ripple" aria-hidden="true"><i /><i /><i /><b>B+S</b><span>TEAMS</span><span>STUDENTS</span><span>AUDIENCES</span></div>
-          <Reveal className="mentorship-copy"><p className="section-index">08 / The work after the work</p><h2>We build people who build worlds.</h2><p className="mentorship-lede">Teaching keeps our point of view moving. Parenthood keeps the stakes human. Mentorship makes both visible in the way we lead.</p><div className="mentor-columns"><article><h3>BRADD / THE SYSTEM</h3><p>MFA-level teaching, curriculum design, and years developing artists, designers, and technical leaders inside production teams.</p></article><article><h3>STONE / THE PRACTICE</h3><p>Guest lectures, talks, mock interviews, and portfolio reviews that help emerging creators turn raw voice into professional momentum.</p></article></div><blockquote>“The next generation is not an audience we speculate about. It is one we teach, mentor, raise, and listen to.”</blockquote></Reveal>
+          <Reveal className="mentorship-copy"><p className="section-index">08 / The work after the work</p><h2>We build people who build worlds.</h2><p className="mentorship-lede">Teaching keeps our point of view moving. Parenthood keeps the stakes human. Mentorship makes both visible in the way we lead.</p><div className="mentor-columns"><article><h3>BRADD / THE SYSTEM</h3><p>Adjunct professor in the Game Design MFA program at Laguna College of Art and Design, plus curriculum design and years developing artists, designers, and technical leaders inside production teams.</p></article><article><h3>STONE / THE PRACTICE</h3><p>Guest lectures, talks, mock interviews, and portfolio reviews that help emerging creators turn raw voice into professional momentum.</p></article></div><blockquote>“The next generation is not an audience we speculate about. It is one we teach, mentor, raise, and listen to.”</blockquote></Reveal>
         </section>
 
         <section className="contact-section" id="contact">
