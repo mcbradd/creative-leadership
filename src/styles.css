@@ -261,7 +261,8 @@ section[id] { scroll-margin-top: 22px; }
 
 .leader-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
   align-items: center;
 }
 .leader-card {
@@ -315,19 +316,6 @@ section[id] { scroll-margin-top: 22px; }
   color: rgba(245, 242, 234, 0.68);
   font-size: 13px;
   line-height: 1.55;
-}
-.plus-mark { display: grid; place-items: center; z-index: 3; }
-.plus-mark span {
-  display: grid;
-  place-items: center;
-  width: 74px;
-  height: 74px;
-  border: 1px solid rgba(255, 255, 255, 0.36);
-  border-radius: 50%;
-  background: #0b0c12;
-  box-shadow: 0 0 42px rgba(103, 92, 255, 0.28);
-  font-size: 27px;
-  color: var(--cyan);
 }
 .partnership-line {
   margin-top: 46px;
@@ -604,8 +592,6 @@ section[id] { scroll-margin-top: 22px; }
   .section-intro { gap: 20px; }
   .leader-grid { grid-template-columns: 1fr; }
   .leader-card { min-height: 650px; }
-  .plus-mark { height: 0; }
-  .plus-mark span { width: 62px; height: 62px; }
   .range-head .section-index, .depth-head .section-index { margin-bottom: 32px; }
   .range-grid { grid-template-columns: 1fr; }
   .range-card { min-height: 260px; padding: 30px 0 58px; }

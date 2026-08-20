@@ -393,8 +393,6 @@ export default function App() {
               </div>
             </article>
 
-            <div className="plus-mark" aria-hidden="true"><span>+</span></div>
-
             <article className="leader-card leader-stone">
               <div className="portrait-wrap">
                 <img src={media("stone-portrait.png")} alt="Stone Perales" />
