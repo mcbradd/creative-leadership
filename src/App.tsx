@@ -266,10 +266,12 @@ function HeroInstruments() {
       <div className="hero-console">
         <p className="console-title">Simulation feed<span>Event horizon proximity</span></p>
         {HERO_PARAMS.map((param) => (
-          <label key={param.id} className="console-row">
+          // The bar itself is the control: the range input covers it invisibly,
+          // so the fill is the only affordance and the handle is redundant.
+          <label key={param.id} className="console-row" style={{ "--fill": `${((values[param.id] - param.min) / (param.max - param.min)) * 100}%` } as CSSProperties}>
             <span>{param.label}</span>
-            <input type="range" min={param.min} max={param.max} step={param.step} value={values[param.id]} onChange={(event) => set(param.id, Number(event.target.value))} />
             <b>{param.format(values[param.id])}</b>
+            <input type="range" min={param.min} max={param.max} step={param.step} value={values[param.id]} onChange={(event) => set(param.id, Number(event.target.value))} />
           </label>
         ))}
       </div>
@@ -298,11 +300,13 @@ function HeroSection() {
       <div className="hero-light-field" aria-hidden="true"><i /><i /></div>
       <div className="hero-orbit" aria-hidden="true"><span /><i /></div>
       <div className="hero-shell">
-        <p className="eyebrow">Two disciplines. One leadership system.</p>
-        <h1>We turn IP into worlds people can <em className="hero-payoff" data-color-flow="payoff">play, collect, and grow.</em></h1>
-        <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="hero-enter" href="#team"><span>Super-Powers Combined</span></a></div>
+        <div className="hero-copy">
+          <p className="eyebrow">Two disciplines. One leadership system.</p>
+          <h1>We turn IP into worlds people can <em className="hero-payoff" data-color-flow="payoff">play, collect, and grow.</em></h1>
+          <div className="hero-footer"><p>Creative direction, art direction, game systems, and franchise thinking—built to move from first idea to market-ready experience.</p><a className="hero-enter" href="#team"><span>Super-Powers Combined</span></a></div>
+          <div className="hero-signals" aria-hidden="true"><span>Original voice</span><i /><span>Product reality</span><i /><span>Durable world</span></div>
+        </div>
         <HeroInstruments />
-        <div className="hero-signals" aria-hidden="true"><span>Original voice</span><i /><span>Product reality</span><i /><span>Durable world</span></div>
       </div>
     </section>
   );

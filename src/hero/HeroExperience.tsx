@@ -33,6 +33,7 @@ uniform float uReveal;
 uniform vec2 uGuard;
 uniform sampler2D uMask;
 uniform vec4 uLavaRect;
+uniform vec4 uMaskRect;
 uniform float uGravity;
 uniform float uEnergy;
 uniform float uWax;
@@ -278,22 +279,41 @@ float smin(float a, float b, float k) {
   return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-// Convection, not a sine: wax heated at the base climbs quickly, stalls at the
-// top while it gives up heat, then sinks back down slower and heavier.
-vec4 blob(float i, float t) {
-  float speed = 0.050 + 0.020 * fract(i * 0.31);
-  float u = fract(t * speed + fract(i * 0.618) + i * 0.077);
-  float rise = smoothstep(0.0, 0.40, u);
-  float fall = smoothstep(0.54, 1.0, u);
-  float y = -1.12 + 2.24 * rise - 2.24 * fall;
+// Wax climbs and sinks on a straight vertical line. Nothing moves it sideways
+// except another blob: two passes of pairwise separation let neighbours roll
+// past one another, which is the only lateral motion in the tube.
+void buildBlobs(float t, out vec4 blobs[LAVA_N]) {
+  for (int i = 0; i < LAVA_N; i++) {
+    float fi = float(i);
+    float speed = 0.050 + 0.020 * fract(fi * 0.31);
+    float u = fract(t * speed + fract(fi * 0.618) + fi * 0.077);
+    // Heated at the base it climbs, stalls at the top while it sheds heat,
+    // then sinks back heavier and slower.
+    float rise = smoothstep(0.0, 0.42, u);
+    float fall = smoothstep(0.56, 1.0, u);
+    float x = (fract(fi * 0.293) * 2.0 - 1.0) * 2.35;
+    float y = -1.12 + 2.24 * rise - 2.24 * fall;
+    float z = (fract(fi * 0.771) * 2.0 - 1.0) * 0.34;
+    blobs[i] = vec4(x, y, z, 0.56 + 0.26 * fract(fi * 0.577));
+  }
 
-  // Crowding peaks mid-tube, where blobs shoulder past one another.
-  float squeeze = 1.0 - abs(y) * 0.82;
-  float baseX = (fract(i * 0.293) * 2.0 - 1.0) * 2.35;
-  float x = baseX + sin(t * 0.42 + i * 2.11) * (0.16 + 0.46 * squeeze);
-  float z = cos(t * 0.27 + i * 1.73) * 0.30;
-  float r = 0.56 + 0.26 * fract(i * 0.577);
-  return vec4(x, y, z, r);
+  for (int relax = 0; relax < 2; relax++) {
+    for (int i = 0; i < LAVA_N; i++) {
+      float push = 0.0;
+      for (int j = 0; j < LAVA_N; j++) {
+        if (j == i) continue;
+        vec3 d = blobs[i].xyz - blobs[j].xyz;
+        float reach = (blobs[i].w + blobs[j].w) * 0.94;
+        float dist = length(d);
+        if (dist >= reach) continue;
+        // Biased by index so two blobs sharing a lane still pick opposite
+        // sides instead of shoving each other the same way forever.
+        float side = (d.x + (float(i) - float(j)) * 0.001) >= 0.0 ? 1.0 : -1.0;
+        push += side * (reach - dist) * 0.55;
+      }
+      blobs[i].x += clamp(push, -0.55, 0.55);
+    }
+  }
 }
 
 // Each blob keeps its own dye. Nearest-centre wins, so two colours meeting at a
@@ -311,32 +331,30 @@ vec3 blobColor(float i) {
   return c;
 }
 
-float lavaField(vec3 p, float t) {
+float lavaField(vec3 p, vec4 blobs[LAVA_N]) {
   float d = 1e9;
   for (int i = 0; i < LAVA_N; i++) {
-    vec4 b = blob(float(i), t);
-    d = smin(d, length(p - b.xyz) - b.w, 0.30);
+    d = smin(d, length(p - blobs[i].xyz) - blobs[i].w, 0.30);
   }
   return d;
 }
 
-vec3 lavaNearestColor(vec3 p, float t) {
+vec3 lavaNearestColor(vec3 p, vec4 blobs[LAVA_N]) {
   float best = 1e9;
   vec3 col = vec3(1.0);
   for (int i = 0; i < LAVA_N; i++) {
-    vec4 b = blob(float(i), t);
-    float d = length(p - b.xyz) - b.w;
+    float d = length(p - blobs[i].xyz) - blobs[i].w;
     if (d < best) { best = d; col = blobColor(float(i)); }
   }
   return col;
 }
 
-vec3 lavaNormal(vec3 p, float t) {
+vec3 lavaNormal(vec3 p, vec4 blobs[LAVA_N]) {
   vec2 e = vec2(0.0018, 0.0);
   return normalize(vec3(
-    lavaField(p + e.xyy, t) - lavaField(p - e.xyy, t),
-    lavaField(p + e.yxy, t) - lavaField(p - e.yxy, t),
-    lavaField(p + e.yyx, t) - lavaField(p - e.yyx, t)
+    lavaField(p + e.xyy, blobs) - lavaField(p - e.xyy, blobs),
+    lavaField(p + e.yxy, blobs) - lavaField(p - e.yxy, blobs),
+    lavaField(p + e.yyx, blobs) - lavaField(p - e.yyx, blobs)
   ));
 }
 
@@ -354,7 +372,12 @@ vec3 glassWall(vec2 q, vec3 rd, float bulbFall) {
   return col;
 }
 
-vec3 lavaScene(vec2 q, float t) {
+// Returns the wax surface, and separately the light it throws, so the caller
+// can spill that glow onto the page around the cut letters.
+vec3 lavaScene(vec2 q, float t, out vec3 glow) {
+  vec4 blobs[LAVA_N];
+  buildBlobs(t, blobs);
+
   vec3 ro = vec3(0.0, 0.0, 2.4);
   vec3 rd = normalize(vec3(q, -1.9));
   float bulbY = -1.62;
@@ -363,40 +386,58 @@ vec3 lavaScene(vec2 q, float t) {
   float dist = 0.0;
   bool hit = false;
   vec3 p = ro;
+  float halo = 0.0;
+  float best = 1e9;
+  vec3 bestP = ro;
   for (int i = 0; i < 64; i++) {
     p = ro + rd * dist;
-    float d = lavaField(p, t);
+    float d = lavaField(p, blobs);
+    if (d < best) { best = d; bestP = p; }
+    // Light leaking out of the wax: a near miss still carries glow, which is
+    // what makes the tube read as lit rather than as flat shapes.
+    halo += exp(-max(d, 0.0) * 3.2) * 0.030;
     if (d < 0.0018) { hit = true; break; }
     dist += d;
     if (dist > 6.5) break;
   }
-  if (!hit) return glassWall(q, rd, bulbFall);
 
-  vec3 n = lavaNormal(p, t);
+  vec3 haloColor = lavaNearestColor(bestP, blobs);
+  glow = haloColor * clamp(halo, 0.0, 1.5);
+  if (!hit) return glassWall(q, rd, bulbFall) + glow * 0.55;
+
+  vec3 n = lavaNormal(p, blobs);
   vec3 bulb = vec3(p.x, bulbY, 0.30);
   vec3 toLight = normalize(bulb - p);
 
   float thickness = 0.0;
   for (int i = 0; i < 7; i++) {
-    thickness += max(0.0, -lavaField(p + toLight * (0.05 + float(i) * 0.13), t));
+    thickness += max(0.0, -lavaField(p + toLight * (0.05 + float(i) * 0.13), blobs));
   }
   // 0.13 is the march step, so this is an optical depth rather than a raw sum.
-  vec3 transmit = exp(-thickness * 0.13 * vec3(0.55, 1.25, 1.95));
+  // Thin absorption on purpose: light has to carry far enough through the dye
+  // for the wax to glow from inside instead of reading as painted plastic.
+  vec3 transmit = exp(-thickness * 0.13 * vec3(0.38, 0.92, 1.42));
   float dist2 = dot(p - bulb, p - bulb);
   float falloff = 1.0 / (1.0 + dist2 * 0.30);
 
   float wrap = clamp(dot(n, toLight) * 0.5 + 0.5, 0.0, 1.0);
-  float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
-  float spec = pow(max(dot(reflect(-toLight, n), -rd), 0.0), 54.0);
+  float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.2);
+  float spec = pow(max(dot(reflect(-toLight, n), -rd), 0.0), 22.0);
 
-  vec3 body = lavaNearestColor(p, t);
+  vec3 body = lavaNearestColor(p, blobs);
   // Hot wax at the base still carries the bulb; cooled wax up top is dimmer.
-  float heat = mix(0.55, 1.35, smoothstep(1.05, -1.05, p.y));
+  float heat = mix(0.70, 1.55, smoothstep(1.05, -1.05, p.y));
 
-  vec3 col = body * transmit * falloff * (0.62 + 1.05 * wrap) * 2.05 * heat;
-  col += body * bulbFall * 0.30;
-  col += vec3(0.82, 0.96, 1.00) * spec * 0.55;
-  col += body * fres * 0.38;
+  // What reaches the eye is bulb light that already scattered through the dye,
+  // so transmission carries the colour and the surface terms only shape it.
+  vec3 col = body * transmit * falloff * (0.85 + 1.30 * wrap) * 3.20 * heat;
+  col += body * bulbFall * 0.85 * heat;
+  col += body * fres * 1.30;
+  col += body * 0.42;
+  col += vec3(0.92, 0.98, 1.00) * spec * 0.45;
+
+  // An emitting surface spills far more light than a near miss does.
+  glow = body * (0.85 + 0.90 * fres) * heat + glow * 0.5;
   return col;
 }
 
@@ -518,13 +559,34 @@ void main() {
   col = tonemap(col);
 
   // The payoff line is a cutout: the glyph mask swaps the backdrop for the wax.
+  // The mask spans only the payoff band, which is what lets it be rasterised
+  // well above framebuffer resolution and keeps the glyph edges off the grid.
   if (uLavaRect.z > 0.5) {
-    vec2 muv = gl_FragCoord.xy / uRes;
-    float m = texture(uMask, vec2(muv.x, 1.0 - muv.y)).r;
-    if (m > 0.002) {
-      vec2 q = (gl_FragCoord.xy - uLavaRect.xy) / uLavaRect.zw * 2.0 - 1.0;
-          q.x *= 2.7;
-      col = mix(col * 0.30, tonemap(lavaScene(q, uTime * uWax) * 0.95 * uReveal), m);
+    vec2 mq = (gl_FragCoord.xy - uMaskRect.xy) / uMaskRect.zw;
+    if (mq.x > 0.0 && mq.x < 1.0 && mq.y > 0.0 && mq.y < 1.0) {
+      vec2 muv = vec2(mq.x, 1.0 - mq.y);
+      vec2 texel = 1.0 / uMaskRect.zw;
+      float m = texture(uMask, muv).r;
+
+      // Dilate the mask into a halo so the wax can throw light past the letters.
+      float ring = 0.0;
+      for (int i = 0; i < 8; i++) {
+        float a = float(i) * 0.7853982;
+        vec2 dir = vec2(cos(a), -sin(a)) * texel;
+        ring = max(ring, texture(uMask, muv + dir * 3.0).r * 0.70);
+        ring = max(ring, texture(uMask, muv + dir * 8.0).r * 0.32);
+        ring = max(ring, texture(uMask, muv + dir * 15.0).r * 0.12);
+      }
+      float spill = max(ring - m, 0.0);
+
+      if (m > 0.002 || spill > 0.002) {
+        vec2 q = (gl_FragCoord.xy - uLavaRect.xy) / uLavaRect.zw * 2.0 - 1.0;
+        q.x *= 2.7;
+        vec3 glow;
+        vec3 wax = lavaScene(q, uTime * uWax, glow);
+        col = mix(col, tonemap(wax * uReveal), m);
+        col += glow * spill * 0.22 * uReveal;
+      }
     }
   }
   col += (hud(gl_FragCoord.xy, uTime) + hudMarks(gl_FragCoord.xy, uRes, uTime)) * uReveal;
@@ -544,6 +606,45 @@ type QualityTier = { dpr: number; octaves: number; steps: number };
 
 // Index 0 is the ceiling; the frame-time governor walks down from wherever the
 // device probe starts it.
+// Debris layer. Points rather than another fullscreen pass: the interesting
+// part is what the shader cannot see, namely the live text boxes and the
+// pointer, so the motion is solved on the CPU and only drawn here.
+const SPARK_VERTEX_SOURCE = `#version 300 es
+precision highp float;
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in float aSize;
+layout(location = 2) in vec3 aColor;
+uniform vec2 uRes;
+out vec3 vColor;
+void main() {
+  vColor = aColor;
+  gl_Position = vec4(aPos / uRes * 2.0 - 1.0, 0.0, 1.0);
+  gl_PointSize = aSize;
+}`;
+
+const SPARK_FRAGMENT_SOURCE = `#version 300 es
+precision highp float;
+in vec3 vColor;
+out vec4 fragColor;
+void main() {
+  vec2 d = gl_PointCoord - 0.5;
+  float falloff = max(0.0, 1.0 - dot(d, d) * 4.0);
+  // Premultiplied: the layer is drawn with ONE, ONE so it only ever adds light.
+  fragColor = vec4(vColor * falloff * falloff, 1.0);
+}`;
+
+// One spark budget per quality tier, same index as QUALITY_TIERS.
+const SPARK_COUNTS = [460, 360, 260, 170, 110];
+const SPARK_MAX = 460;
+const SPARK_TRAIL = 6;
+const SPARK_VERTS = SPARK_MAX + SPARK_TRAIL * 4;
+const SPARK_COLORS = [
+  [1.0, 0.18, 0.62],
+  [1.0, 0.44, 0.86],
+  [0.52, 0.26, 1.0],
+  [0.1, 0.9, 1.0],
+];
+
 const QUALITY_TIERS: readonly QualityTier[] = [
   { steps: 260, octaves: 5, dpr: 1.5 },
   { steps: 200, octaves: 4, dpr: 1.25 },
@@ -652,10 +753,260 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     const uGuard = uniform("uGuard");
     const uMask = uniform("uMask");
     const uLavaRect = uniform("uLavaRect");
+    const uMaskRect = uniform("uMaskRect");
     const uGravity = uniform("uGravity");
     const uEnergy = uniform("uEnergy");
     const uWax = uniform("uWax");
     const uHud = uniform("uHud");
+
+    // The spark layer is optional: if it fails to build, the backdrop still
+    // renders and only the debris is missing.
+    const sparkVertex = compile(gl, gl.VERTEX_SHADER, SPARK_VERTEX_SOURCE);
+    const sparkFragment = compile(gl, gl.FRAGMENT_SHADER, SPARK_FRAGMENT_SOURCE);
+    const sparkProgram = sparkVertex && sparkFragment ? gl.createProgram() : null;
+    if (sparkProgram && sparkVertex && sparkFragment) {
+      gl.attachShader(sparkProgram, sparkVertex);
+      gl.attachShader(sparkProgram, sparkFragment);
+      gl.linkProgram(sparkProgram);
+    }
+    if (sparkVertex) gl.deleteShader(sparkVertex);
+    if (sparkFragment) gl.deleteShader(sparkFragment);
+    const sparksReady = !!sparkProgram && gl.getProgramParameter(sparkProgram, gl.LINK_STATUS);
+    const sparkVao = sparksReady ? gl.createVertexArray() : null;
+    const sparkBuffer = sparksReady ? gl.createBuffer() : null;
+    const uSparkRes = sparksReady && sparkProgram ? gl.getUniformLocation(sparkProgram, "uRes") : null;
+    const sparkVerts = new Float32Array(SPARK_VERTS * 6);
+    if (sparksReady && sparkVao && sparkBuffer) {
+      gl.bindVertexArray(sparkVao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, sparkBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, sparkVerts.byteLength, gl.DYNAMIC_DRAW);
+      const stride = 6 * 4;
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(1, 1, gl.FLOAT, false, stride, 8);
+      gl.enableVertexAttribArray(2);
+      gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 12);
+      gl.bindVertexArray(vao);
+      gl.useProgram(program);
+    }
+
+    // Spark state, all in framebuffer pixels with y pointing up like gl_FragCoord.
+    const sx = new Float32Array(SPARK_MAX);
+    const sy = new Float32Array(SPARK_MAX);
+    const svx = new Float32Array(SPARK_MAX);
+    const svy = new Float32Array(SPARK_MAX);
+    const sz = new Float32Array(SPARK_MAX);
+    const szv = new Float32Array(SPARK_MAX);
+    const sflash = new Float32Array(SPARK_MAX);
+    const shue = new Uint8Array(SPARK_MAX);
+    let sparkCount = 0;
+    let wellX = 0;
+    let wellY = 0;
+    let wellPull = 0;
+    let seeded = false;
+    let whipIndex = -1;
+    let whipLife = 0;
+    let nextWhip = 2.2;
+    // Text boxes the debris bounces off, as [left, bottom, right, top].
+    let obstacles: number[][] = [];
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerLife = 0;
+
+    const spawnSpark = (i: number, fresh: boolean) => {
+      const minSide = Math.min(canvas.width, canvas.height);
+      const angle = Math.random() * Math.PI * 2;
+      const radius = minSide * (fresh ? 0.14 + Math.random() * 0.62 : 0.5 + Math.random() * 0.35);
+      sx[i] = wellX + Math.cos(angle) * radius;
+      sy[i] = wellY + Math.sin(angle) * radius;
+      // Circular velocity for the softened well, so debris orbits instead of
+      // dropping straight in.
+      const speed = Math.sqrt(wellPull / Math.max(radius, minSide * 0.06)) * (0.82 + Math.random() * 0.3);
+      const spin = Math.random() < 0.86 ? 1 : -1;
+      svx[i] = -Math.sin(angle) * speed * spin;
+      svy[i] = Math.cos(angle) * speed * spin;
+      // A quarter of the field drifts toward the camera, which is what carries
+      // sparks out past the headline and off the front of the frame.
+      sz[i] = 0;
+      szv[i] = Math.random() < 0.26 ? 0.06 + Math.random() * 0.16 : 0;
+      sflash[i] = 0;
+      shue[i] = (Math.random() * SPARK_COLORS.length) | 0;
+    };
+
+    const measureObstacles = () => {
+      const host = canvas.parentElement;
+      const canvasRect = canvas.getBoundingClientRect();
+      if (!host || canvasRect.width < 1 || canvasRect.height < 1) return;
+      const scaleX = canvas.width / canvasRect.width;
+      const scaleY = canvas.height / canvasRect.height;
+      const boxes: DOMRect[] = [];
+      const headline = host.querySelector("h1");
+      if (headline) {
+        // Per-line rects rather than the whole heading block: debris should
+        // glance off the words, not off an invisible column beside them.
+        const range = document.createRange();
+        range.selectNodeContents(headline);
+        boxes.push(...range.getClientRects());
+      }
+      for (const node of host.querySelectorAll<HTMLElement>(".hero-enter, .hero-console")) {
+        boxes.push(node.getBoundingClientRect());
+      }
+      obstacles = boxes
+        .filter((box) => box.width > 8 && box.height > 8)
+        .map((box) => {
+          const left = (box.left - canvasRect.left) * scaleX;
+          const right = (box.right - canvasRect.left) * scaleX;
+          // gl_FragCoord counts from the bottom, the DOM box from the top.
+          const top = canvas.height - (box.top - canvasRect.top) * scaleY;
+          const bottom = canvas.height - (box.bottom - canvasRect.top) * scaleY;
+          return [left, bottom, right, top];
+        });
+    };
+
+    const onPointer = (event: PointerEvent) => {
+      const canvasRect = canvas.getBoundingClientRect();
+      if (canvasRect.width < 1 || canvasRect.height < 1) return;
+      pointerX = (event.clientX - canvasRect.left) * (canvas.width / canvasRect.width);
+      pointerY = canvas.height - (event.clientY - canvasRect.top) * (canvas.height / canvasRect.height);
+      pointerLife = 1.2;
+    };
+    const pointerHost = canvas.parentElement;
+    pointerHost?.addEventListener("pointermove", onPointer, { passive: true });
+    pointerHost?.addEventListener("pointerdown", onPointer, { passive: true });
+
+    const bounceSpark = (i: number) => {
+      for (const box of obstacles) {
+        if (sx[i] < box[0] || sx[i] > box[2] || sy[i] < box[1] || sy[i] > box[3]) continue;
+        const toLeft = sx[i] - box[0];
+        const toRight = box[2] - sx[i];
+        const toBottom = sy[i] - box[1];
+        const toTop = box[3] - sy[i];
+        const least = Math.min(toLeft, toRight, toBottom, toTop);
+        if (least === toLeft) { sx[i] = box[0] - 1; svx[i] = -Math.abs(svx[i]) * 0.74; }
+        else if (least === toRight) { sx[i] = box[2] + 1; svx[i] = Math.abs(svx[i]) * 0.74; }
+        else if (least === toBottom) { sy[i] = box[1] - 1; svy[i] = -Math.abs(svy[i]) * 0.74; }
+        else { sy[i] = box[3] + 1; svy[i] = Math.abs(svy[i]) * 0.74; }
+        sflash[i] = 1;
+        return;
+      }
+    };
+
+    const stepSparks = (dt: number, energy: number) => {
+      const width = canvas.width;
+      const height = canvas.height;
+      const minSide = Math.min(width, height);
+      const eaten = minSide * 0.05;
+      const soft = minSide * 0.06;
+      const margin = minSide * 0.25;
+      pointerLife = Math.max(0, pointerLife - dt);
+
+      whipLife = Math.max(0, whipLife - dt);
+      nextWhip -= dt;
+      if (nextWhip <= 0 && sparkCount > 0) {
+        // One spark at a time gets thrown across the frame, so the field never
+        // settles into a loop the eye can memorise.
+        nextWhip = 2.4 + Math.random() * 4.5;
+        whipLife = 0.7;
+        whipIndex = (Math.random() * sparkCount) | 0;
+        const edge = Math.random() * Math.PI * 2;
+        sx[whipIndex] = width * 0.5 + Math.cos(edge) * width * 0.62;
+        sy[whipIndex] = height * 0.5 + Math.sin(edge) * height * 0.62;
+        const aim = Math.atan2(height * 0.5 - sy[whipIndex], width * 0.5 - sx[whipIndex]) + (Math.random() - 0.5) * 0.9;
+        const speed = minSide * (1.1 + 0.5 * energy);
+        svx[whipIndex] = Math.cos(aim) * speed;
+        svy[whipIndex] = Math.sin(aim) * speed;
+        sz[whipIndex] = 0.2;
+        szv[whipIndex] = 0;
+        sflash[whipIndex] = 1.4;
+      }
+
+      for (let i = 0; i < sparkCount; i += 1) {
+        const dx = wellX - sx[i];
+        const dy = wellY - sy[i];
+        const r = Math.max(Math.sqrt(dx * dx + dy * dy), soft);
+        const pull = (wellPull / (r * r)) * dt;
+        svx[i] += (dx / r) * pull;
+        svy[i] += (dy / r) * pull;
+
+        if (pointerLife > 0) {
+          const px = sx[i] - pointerX;
+          const py = sy[i] - pointerY;
+          const pd2 = px * px + py * py;
+          const reach = minSide * 0.16;
+          if (pd2 < reach * reach && pd2 > 1) {
+            // Pointer wake: debris is shoved aside, which is the cheapest proof
+            // the field is live rather than a clip.
+            const pd = Math.sqrt(pd2);
+            const shove = (1 - pd / reach) * minSide * 2.6 * dt;
+            svx[i] += (px / pd) * shove;
+            svy[i] += (py / pd) * shove;
+            sflash[i] = Math.max(sflash[i], 0.6);
+          }
+        }
+
+        sx[i] += svx[i] * dt;
+        sy[i] += svy[i] * dt;
+        sz[i] += szv[i] * dt;
+        sflash[i] = Math.max(0, sflash[i] - dt * 2.2);
+
+        if (i !== whipIndex || whipLife <= 0) bounceSpark(i);
+
+        const off = sx[i] < -margin || sx[i] > width + margin || sy[i] < -margin || sy[i] > height + margin;
+        if (off || sz[i] > 1 || (Math.abs(dx) < eaten && Math.abs(dy) < eaten)) {
+          if (i === whipIndex) whipLife = 0;
+          spawnSpark(i, false);
+        }
+      }
+    };
+
+    const writeSpark = (slot: number, x: number, y: number, size: number, color: number[], gain: number) => {
+      const at = slot * 6;
+      sparkVerts[at] = x;
+      sparkVerts[at + 1] = y;
+      sparkVerts[at + 2] = size;
+      sparkVerts[at + 3] = color[0] * gain;
+      sparkVerts[at + 4] = color[1] * gain;
+      sparkVerts[at + 5] = color[2] * gain;
+    };
+
+    const drawSparks = (energy: number, reveal: number) => {
+      if (!sparksReady || !sparkProgram || !sparkVao || !sparkBuffer) return;
+      const dpr = canvas.width / Math.max(1, canvas.clientWidth);
+      let slot = 0;
+      for (let i = 0; i < sparkCount; i += 1) {
+        const near = Math.max(0, sz[i]);
+        // Approaching debris is pushed away from the well on screen as well as
+        // scaled up, so it sweeps out past the headline toward the viewer.
+        const x = wellX + (sx[i] - wellX) * (1 + near * 1.9);
+        const y = wellY + (sy[i] - wellY) * (1 + near * 1.9);
+        const size = Math.min(30, dpr * (1.9 + near * 9.5) * (1 + sflash[i] * 0.7));
+        const gain = (0.5 + 0.7 * energy) * (1 + sflash[i] * 1.6) * (1 - near * 0.3) * reveal;
+        writeSpark(slot, x, y, size, SPARK_COLORS[shue[i]], gain);
+        slot += 1;
+      }
+      if (whipLife > 0 && whipIndex >= 0 && whipIndex < sparkCount) {
+        const color = SPARK_COLORS[shue[whipIndex]];
+        for (let t = 1; t <= SPARK_TRAIL; t += 1) {
+          const back = t * 0.011;
+          writeSpark(slot, sx[whipIndex] - svx[whipIndex] * back, sy[whipIndex] - svy[whipIndex] * back, dpr * (3.4 - t * 0.4), color, (1.5 - t * 0.2) * reveal);
+          slot += 1;
+        }
+      }
+      if (!slot) return;
+
+      gl.useProgram(sparkProgram);
+      gl.bindVertexArray(sparkVao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, sparkBuffer);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, sparkVerts, 0, slot * 6);
+      gl.uniform2f(uSparkRes, canvas.width, canvas.height);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.drawArrays(gl.POINTS, 0, slot);
+      gl.disable(gl.BLEND);
+      gl.bindVertexArray(vao);
+      gl.useProgram(program);
+    };
 
     let tier = startingTier();
     let disposed = false;
@@ -679,12 +1030,19 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+    // The mask covers the payoff band plus a halo margin, not the whole canvas,
+    // so it can be rasterised well above framebuffer resolution: that oversample
+    // is what keeps the glyph edges off the pixel grid instead of jagged.
+    const MASK_SS = 3;
+    const MASK_MAX = 2048;
+
     const buildMask = () => {
       const target = canvas.parentElement?.querySelector<HTMLElement>(".hero-payoff");
       const node = target?.firstChild;
       const ctx = maskCanvas.getContext("2d");
       if (!target || !ctx || !node || node.nodeType !== Node.TEXT_NODE) {
         gl.uniform4f(uLavaRect, 0, 0, 0, 0);
+        gl.uniform4f(uMaskRect, 0, 0, 1, 1);
         return;
       }
       const canvasRect = canvas.getBoundingClientRect();
@@ -692,9 +1050,21 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       const scaleX = canvas.width / canvasRect.width;
       const scaleY = canvas.height / canvasRect.height;
 
-      maskCanvas.width = canvas.width;
-      maskCanvas.height = canvas.height;
-      ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+      const box = target.getBoundingClientRect();
+      // Glow has to reach past the letters, so the mask band is padded and the
+      // shader dilates within it.
+      const pad = Math.max(24, box.height * 0.6);
+      const bandLeft = box.left - canvasRect.left - pad;
+      const bandTop = box.top - canvasRect.top - pad;
+      const bandW = box.width + pad * 2;
+      const bandH = box.height + pad * 2;
+
+      const ss = Math.min(MASK_SS, MASK_MAX / Math.max(1, bandW * scaleX));
+      const texW = Math.max(1, Math.round(bandW * scaleX * ss));
+      const texH = Math.max(1, Math.round(bandH * scaleY * ss));
+      maskCanvas.width = texW;
+      maskCanvas.height = texH;
+      ctx.clearRect(0, 0, texW, texH);
 
       const styles = getComputedStyle(target);
       ctx.font = `${styles.fontStyle} ${styles.fontWeight} ${parseFloat(styles.fontSize)}px ${styles.fontFamily}`;
@@ -711,22 +1081,26 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         const glyph = range.getBoundingClientRect();
         if (glyph.width < 0.5) continue;
         ctx.save();
-        ctx.translate((glyph.left + glyph.width / 2 - canvasRect.left) * scaleX, (glyph.top + glyph.height / 2 - canvasRect.top) * scaleY);
-        ctx.scale(scaleX, scaleY);
+        ctx.translate(
+          (glyph.left + glyph.width / 2 - canvasRect.left - bandLeft) * scaleX * ss,
+          (glyph.top + glyph.height / 2 - canvasRect.top - bandTop) * scaleY * ss,
+        );
+        ctx.scale(scaleX * ss, scaleY * ss);
         ctx.fillText(text[i], 0, 0);
         ctx.restore();
       }
 
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, maskTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
 
-      const box = target.getBoundingClientRect();
-      const width = box.width * scaleX;
-      const height = box.height * scaleY;
-      const left = (box.left - canvasRect.left) * scaleX;
       // gl_FragCoord counts from the bottom, the DOM box from the top.
-      const bottom = canvas.height - (box.top - canvasRect.top) * scaleY - height;
-      gl.uniform4f(uLavaRect, left, bottom, width, height);
+      const glyphW = box.width * scaleX;
+      const glyphH = box.height * scaleY;
+      const glyphLeft = (box.left - canvasRect.left) * scaleX;
+      const glyphBottom = canvas.height - (box.top - canvasRect.top) * scaleY - glyphH;
+      gl.uniform4f(uLavaRect, glyphLeft, glyphBottom, glyphW, glyphH);
+      gl.uniform4f(uMaskRect, glyphLeft - pad * scaleX, glyphBottom - pad * scaleY, bandW * scaleX, bandH * scaleY);
     };
 
     const resize = () => {
@@ -756,6 +1130,20 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       const rx = portrait ? width * 0.34 : width * 0.15;
       gl.uniform4f(uHud, width * (portrait ? 0.5 : 0.545), height * (portrait ? 0.14 : 0.115), rx, rx * 0.30);
       buildMask();
+      measureObstacles();
+
+      // The sparks orbit the same well the shader draws: uCenter is in
+      // aspect-corrected NDC, so it has to come back to pixels here.
+      const aspect = width / Math.max(1, height);
+      wellX = ((view.center[0] / aspect + 1) / 2) * width;
+      wellY = ((view.center[1] + 1) / 2) * height;
+      const minSide = Math.min(width, height);
+      wellPull = 9.5 * minSide * minSide;
+      sparkCount = Math.min(SPARK_MAX, SPARK_COUNTS[tier]);
+      if (!seeded) {
+        seeded = true;
+        for (let i = 0; i < SPARK_MAX; i += 1) spawnSpark(i, true);
+      }
     };
 
     resize();
@@ -782,8 +1170,9 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       // fast patch climbs back, so a weak GPU degrades instead of stuttering.
       // The fast bound has to sit above a 60Hz vsync frame (16.7ms) or the
       // climb-back can never fire on an ordinary display.
+      const lastCost = lastStamp ? stamp - lastStamp : 0;
       if (lastStamp) {
-        const cost = stamp - lastStamp;
+        const cost = lastCost;
         if (cost > 24) {
           slowRun += 1;
           fastRun = 0;
@@ -803,13 +1192,20 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       }
       lastStamp = stamp;
 
+      const reveal = Math.min(1, wall / 1.4);
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
       gl.uniform1f(uTime, elapsed);
-      gl.uniform1f(uReveal, Math.min(1, wall / 1.4));
+      gl.uniform1f(uReveal, reveal);
       gl.uniform1f(uGravity, 1.5 * heroParams.gravity);
       gl.uniform1f(uEnergy, heroParams.energy);
       gl.uniform1f(uWax, heroParams.waxFlow);
       gl.uniform1f(uIncl, viewIncl * heroParams.tilt);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      const frameStep = Math.min(0.05, lastCost ? lastCost / 1000 : 0.016) * heroParams.timeScale;
+      stepSparks(frameStep, heroParams.energy);
+      drawSparks(heroParams.energy, reveal);
 
       if (!announced && elapsed > 0.05) {
         announced = true;
@@ -829,7 +1225,12 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       cancelAnimationFrame(frame);
       observer.disconnect();
       canvas.removeEventListener("webglcontextlost", onLost);
+      pointerHost?.removeEventListener("pointermove", onPointer);
+      pointerHost?.removeEventListener("pointerdown", onPointer);
       gl.deleteProgram(program);
+      if (sparkProgram) gl.deleteProgram(sparkProgram);
+      if (sparkVao) gl.deleteVertexArray(sparkVao);
+      if (sparkBuffer) gl.deleteBuffer(sparkBuffer);
       gl.deleteVertexArray(vao);
       gl.deleteTexture(maskTexture);
       // Never force-lose the context here: getContext() hands the same object

@@ -1,0 +1,18 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "h2 em.lava-flow",
+        "createdAt": "2026-08-21T04:26:08.116Z"
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": ".hero-grid",
+        "createdAt": "2026-08-21T04:26:08.174Z"
+      }
+    ]
+  }
+}
