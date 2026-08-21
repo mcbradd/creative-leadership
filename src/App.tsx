@@ -259,8 +259,8 @@ function DetailArticle({ detail, onClose }: { detail: Detail; onClose: () => voi
           <div className="tetris-detail-media">
             <TetrisReel
               active
-              posterSrc={media("tetris-brand-mark-final.webp")}
-              posterAlt="Rainbow Tetris Beat logo on a purple concert-light background"
+              posterSrc={media("tetris-reel-poster.webp")}
+              posterAlt="Portrait Tetris Beat key art with the game logo above a neon geometric world"
             />
             <div className="tetris-art-grid" aria-label="Tetris Beat portfolio artwork">
               {tetrisPortfolioMedia.map((item) => (
@@ -610,8 +610,8 @@ function ProofSlide({ active, onOpen }: { active: boolean; onOpen: (detail: Deta
             active={active}
             compact
             className="proof-reel"
-            posterSrc={media("tetris-brand-mark-final.webp")}
-            posterAlt="Rainbow Tetris Beat logo on a purple concert-light background"
+            posterSrc={media("tetris-reel-poster.webp")}
+            posterAlt="Portrait Tetris Beat key art with the game logo above a neon geometric world"
           />
           <div className="proof-metrics">
             {proofMetrics.map((item, index) => (

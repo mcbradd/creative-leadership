@@ -148,7 +148,7 @@ describe("one-viewport presentation layout", () => {
     }
   });
 
-  test("Proven Together gives the 16:9 Tetris reel a large right-hand desktop stage and a contained mobile stage", async () => {
+  test("Proven Together keeps the native 221:480 Tetris portrait right of its supporting proof", async () => {
     const proofViewports = [
       ["short phone", { width: 390, height: 650 }],
       ["phone", { width: 440, height: 956 }],
@@ -195,7 +195,7 @@ describe("one-viewport presentation layout", () => {
         });
 
         const aspectRatio = report.stage.width / report.stage.height;
-        assert.ok(Math.abs(aspectRatio - (16 / 9)) <= 0.04, `${name}: stage ratio is ${aspectRatio}`);
+        assert.ok(Math.abs(aspectRatio - (221 / 480)) <= 0.005, `${name}: stage ratio is ${aspectRatio}`);
         assert.ok(report.stage.top >= report.header.bottom - EPSILON, `${name}: reel stage is behind the header`);
         assert.ok(report.stage.bottom <= report.cue.top + EPSILON, `${name}: reel stage is behind the presentation cue`);
         assert.ok(report.stage.left >= -EPSILON && report.stage.right <= viewport.width + EPSILON, `${name}: reel stage escapes horizontally`);
@@ -209,6 +209,8 @@ describe("one-viewport presentation layout", () => {
           assert.ok(report.stage.left >= report.heading.right + EPSILON, "desktop: reel must sit to the right of the slide heading");
           assert.ok(report.stage.left >= report.metrics.right + EPSILON, "desktop: reel must sit to the right of the metrics");
           assert.ok(report.stage.height >= 300, `desktop: reel stage is only ${report.stage.height}px tall`);
+        } else {
+          assert.ok(report.stage.left >= report.metrics.right + EPSILON, `${name}: metrics must stay left of the portrait reel`);
         }
       } finally {
         await context.close();

@@ -295,11 +295,12 @@ describe("mobile-first presentation interactions", () => {
       await page.locator("#range").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
       const tabs = page.getByRole("tablist", { name: "Ecosystem lenses" }).getByRole("tab");
       assert.equal(await tabs.count(), 3);
+      assert.match(await page.locator("#range [role='tabpanel'] img").getAttribute("src"), /case-ultimate-rivals-restored\.webp$/);
       await tabs.nth(1).click();
       assert.equal(await tabs.nth(1).getAttribute("aria-selected"), "true");
       assert.match(await page.locator("#range [role='tabpanel'] img").getAttribute("src"), /stone-raid-hires\.webp$/);
       await tabs.nth(2).click();
-      assert.match(await page.locator("#range [role='tabpanel'] img").getAttribute("src"), /stone-chaotic-hires\.webp$/);
+      assert.match(await page.locator("#range [role='tabpanel'] img").getAttribute("src"), /case-chaotic-restored\.webp$/);
       assert.equal(await page.locator("#range").getByRole("button", { name: /HERE'S HOW/ }).count(), 1);
 
       const stage = page.locator("#range .range-stage");

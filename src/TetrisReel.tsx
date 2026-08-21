@@ -240,8 +240,8 @@ export default function TetrisReel({
 
     return () => {
       cancelled = true;
-      player?.pauseVideo();
-      player?.destroy();
+      if (player && typeof player.pauseVideo === "function") player.pauseVideo();
+      if (player && typeof player.destroy === "function") player.destroy();
       if (playerRef.current === player) playerRef.current = null;
       mount?.replaceChildren();
       setIsReady(false);
@@ -353,6 +353,8 @@ export default function TetrisReel({
             onClick={togglePlayback}
             disabled={shouldLoad && !effectiveReady && !loadError}
             aria-pressed={effectivePlaying}
+            aria-label={playbackLabel}
+            title={playbackLabel}
           >
             {effectivePlaying ? <Pause weight="fill" aria-hidden="true" /> : <Play weight="fill" aria-hidden="true" />}
             <span>{playbackLabel}</span>
@@ -362,11 +364,19 @@ export default function TetrisReel({
             onClick={toggleSound}
             disabled={!effectiveReady}
             aria-pressed={effectiveSoundOn}
+            aria-label={effectiveSoundOn ? "Sound on" : "Sound off"}
+            title={effectiveSoundOn ? "Mute clip" : "Unmute clip"}
           >
             {effectiveSoundOn ? <SpeakerHigh weight="fill" aria-hidden="true" /> : <SpeakerSlash weight="fill" aria-hidden="true" />}
             <span>{effectiveSoundOn ? "Sound on" : "Sound off"}</span>
           </button>
-          <button type="button" onClick={reloadClip} disabled={!effectiveReady}>
+          <button
+            type="button"
+            onClick={reloadClip}
+            disabled={!effectiveReady}
+            aria-label="Reload clip"
+            title="Replay clip from 7:13"
+          >
             <ArrowCounterClockwise weight="bold" aria-hidden="true" />
             <span>Reload clip</span>
           </button>
@@ -378,9 +388,18 @@ export default function TetrisReel({
         ) : null}
       </div>
       <figcaption>
-        <span>TETRIS BEAT GAMEPLAY · 07:13 TO 07:40</span>
-        <a href={WATCH_URL} target="_blank" rel="noreferrer">
-          FULL WALKTHROUGH
+        <span className="tetris-reel__attribution">
+          <span>TETRIS BEAT</span>
+          <span className="tetris-reel__attribution-detail"> GAMEPLAY · </span>
+          <span>07:13–07:40</span>
+        </span>
+        <a
+          href={WATCH_URL}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open the full Tetris Beat walkthrough on YouTube"
+        >
+          <span>FULL WALKTHROUGH</span>
           <ArrowSquareOut weight="bold" aria-hidden="true" />
         </a>
       </figcaption>

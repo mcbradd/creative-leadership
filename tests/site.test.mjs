@@ -5,6 +5,40 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const source = (file) => readFile(new URL(file, root), "utf8");
 
+async function webpDimensions(file) {
+  const data = await readFile(new URL(`public/media/${file}`, root));
+  assert.equal(data.subarray(0, 4).toString(), "RIFF", `${file}: invalid RIFF header`);
+  assert.equal(data.subarray(8, 12).toString(), "WEBP", `${file}: invalid WebP header`);
+
+  for (let offset = 12; offset + 8 <= data.length;) {
+    const type = data.subarray(offset, offset + 4).toString();
+    const size = data.readUInt32LE(offset + 4);
+    const payload = offset + 8;
+    if (type === "VP8 ") {
+      assert.equal(data.subarray(payload + 3, payload + 6).toString("hex"), "9d012a", `${file}: invalid VP8 frame`);
+      return {
+        width: data.readUInt16LE(payload + 6) & 0x3fff,
+        height: data.readUInt16LE(payload + 8) & 0x3fff,
+      };
+    }
+    if (type === "VP8L") {
+      const bits = data.readUInt32LE(payload + 1);
+      return {
+        width: (bits & 0x3fff) + 1,
+        height: ((bits >>> 14) & 0x3fff) + 1,
+      };
+    }
+    if (type === "VP8X") {
+      return {
+        width: data.readUIntLE(payload + 4, 3) + 1,
+        height: data.readUIntLE(payload + 7, 3) + 1,
+      };
+    }
+    offset = payload + size + (size % 2);
+  }
+  assert.fail(`${file}: no WebP dimension chunk`);
+}
+
 test("publishes a private executive presentation with the approved proposition", async () => {
   const [html, app] = await Promise.all([source("index.html"), source("src/App.tsx")]);
 
@@ -140,6 +174,36 @@ test("uses the current headshot and the corrected Tetris production record", asy
   assert.doesNotMatch(app, />28<|28\s+LIVE LEVELS/i);
   assert.match(copy, /20\+ artists/i);
   assert.match(copy, /Bucharest[\s\S]*Guadalajara/i);
+});
+
+test("uses the native-resolution Tetris stills, portrait poster, and restored Range artwork", async () => {
+  const [app, content] = await Promise.all([source("src/App.tsx"), source("src/content.ts")]);
+  const portfolioBlock = app.split("const tetrisPortfolioMedia = [")[1].split("];", 1)[0];
+  const rangeBlock = content.split("export const rangeVisuals")[1].split("export const caseStudies", 1)[0];
+  const gameplayStills = [
+    "tetris-main-menu-vfx.webp",
+    "tetris-summersalts.webp",
+    "tetris-falling-fantasy.webp",
+    "tetris-accidental-love.webp",
+  ];
+
+  for (const file of gameplayStills) assert.ok(portfolioBlock.includes(`image: "${file}"`), `${file}: missing from Tetris gallery`);
+  assert.deepEqual(
+    await Promise.all(gameplayStills.map(webpDimensions)),
+    gameplayStills.map(() => ({ width: 2560, height: 1440 })),
+  );
+
+  assert.equal((app.match(/posterSrc=\{media\("tetris-reel-poster\.webp"\)\}/g) ?? []).length, 2);
+  assert.deepEqual(await webpDimensions("tetris-reel-poster.webp"), { width: 1242, height: 2208 });
+
+  const rangeArtwork = [
+    ["play", "case-ultimate-rivals-restored.webp"],
+    ["grow", "case-chaotic-restored.webp"],
+  ];
+  for (const [lens, file] of rangeArtwork) {
+    assert.match(rangeBlock, new RegExp(`${lens}: \\{ image: "${file.replaceAll(".", "\\.")}"`));
+    assert.deepEqual(await webpDimensions(file), { width: 1920, height: 1080 });
+  }
 });
 
 test("keeps representation balanced and concrete", async () => {

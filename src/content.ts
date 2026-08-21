@@ -166,9 +166,9 @@ export const jointInsights: Record<"tetris" | "crayola", Insight> = {
 };
 
 export const rangeVisuals: Record<"play" | "collect" | "grow", { image: string; alt: string; label: string; position: string }> = {
-  play: { image: "ultimate-rivals-hires.webp", alt: "Ultimate Rivals gameplay in a multi-league sports arena", label: "Playable multi-league product vision", position: "33% center" },
+  play: { image: "case-ultimate-rivals-restored.webp", alt: "Ultimate Rivals gameplay in a multi-league sports arena", label: "Playable multi-league product vision", position: "33% center" },
   collect: { image: "stone-raid-hires.webp", alt: "RAID fantasy card artwork from Stone's portfolio", label: "Card and collectible direction", position: "center 52%" },
-  grow: { image: "stone-chaotic-hires.webp", alt: "Chaotic trading card artwork from the transmedia franchise", label: "A visual system built across formats", position: "center" },
+  grow: { image: "case-chaotic-restored.webp", alt: "Chaotic trading card artwork from the transmedia franchise", label: "A visual system built across formats", position: "center" },
 };
 
 export const caseStudies: CaseStudy[] = [
