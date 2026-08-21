@@ -346,7 +346,7 @@ describe("responsive layout contract", () => {
     }
   });
 
-  test("mobile lower profile and evidence cards stack in one readable, contained column", async () => {
+  test("mobile lower profile and evidence cards form a readable horizontal sub-deck", async () => {
     for (const [name, viewport] of LOWER_CARD_VIEWPORTS) {
       const { context, page, faults } = await openAuditedPage(viewport);
       try {
@@ -368,13 +368,20 @@ describe("responsive layout contract", () => {
               descendants: [...child.children].map((descendant) => ({
                 text: descendant.textContent?.replace(/\s+/g, " ").trim() ?? "",
                 rect: bounds(descendant),
-              })),
+              })).filter((descendant) => descendant.rect.width > 0 && descendant.rect.height > 0),
             })).map((item) => ({ ...item, containerRect }));
           };
 
           const profileHead = timeline.querySelector(".timeline-head");
+          const track = timeline.querySelector(".timeline-track");
           return {
             profiles: profileHead ? inspectChildren(profileHead) : [],
+            track: track ? {
+              rect: bounds(track),
+              clientWidth: track.clientWidth,
+              scrollWidth: track.scrollWidth,
+              snapType: getComputedStyle(track).scrollSnapType,
+            } : null,
             evidenceRows: [...timeline.querySelectorAll(".timeline-row")].map((row) => ({
               row: bounds(row),
               articles: inspectChildren(row).filter((item) => item.text && item.rect.width > 44),
@@ -384,7 +391,7 @@ describe("responsive layout contract", () => {
 
         assert.equal(report.profiles.length, 2, `${name} must render both lower profile cards`);
         for (const [index, profile] of report.profiles.entries()) {
-          assert.ok(Math.abs(profile.rect.width - profile.containerRect.width) <= EPSILON, `${name} profile ${index + 1} is not a full-width mobile card`);
+          assert.ok(Math.abs(profile.rect.width - profile.containerRect.width / 2) <= EPSILON, `${name} profile ${index + 1} is not one half of the paired profile header`);
           assert.ok(profile.scrollWidth <= profile.clientWidth + EPSILON, `${name} profile ${index + 1} has horizontal overflow`);
           assert.ok(profile.scrollHeight <= profile.clientHeight + EPSILON, `${name} profile ${index + 1} has vertical overflow`);
           for (const child of profile.descendants) {
@@ -392,13 +399,18 @@ describe("responsive layout contract", () => {
             assert.ok(child.rect.top >= profile.rect.top - EPSILON && child.rect.bottom <= profile.rect.bottom + EPSILON, `${name} profile ${index + 1} text escapes vertically: ${child.text}`);
           }
         }
-        assert.ok(report.profiles[1].rect.top >= report.profiles[0].rect.bottom - EPSILON, `${name} lower profile cards remain side-by-side instead of stacking`);
+        assert.ok(Math.abs(report.profiles[1].rect.top - report.profiles[0].rect.top) <= EPSILON, `${name} paired profile headers are not aligned`);
+        assert.ok(report.profiles[1].rect.left >= report.profiles[0].rect.right - EPSILON, `${name} paired profile headers overlap`);
+
+        assert.ok(report.track, `${name} is missing the horizontal evidence track`);
+        assert.match(report.track.snapType, /x/, `${name} evidence track does not advertise horizontal snapping`);
+        assert.ok(report.track.scrollWidth > report.track.clientWidth + EPSILON, `${name} evidence track has no additional paged evidence`);
 
         assert.ok(report.evidenceRows.length > 0, `${name} must render lower evidence rows`);
         for (const [rowIndex, evidence] of report.evidenceRows.entries()) {
           assert.equal(evidence.articles.length, 2, `${name} evidence row ${rowIndex + 1} must contain two articles`);
           for (const [articleIndex, article] of evidence.articles.entries()) {
-            assert.ok(Math.abs(article.rect.width - evidence.row.width) <= EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} is not full width`);
+            assert.ok(Math.abs(article.rect.width - evidence.row.width / 2) <= EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} is not one half of its paired evidence page`);
             assert.ok(article.scrollWidth <= article.clientWidth + EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} has horizontal overflow`);
             assert.ok(article.scrollHeight <= article.clientHeight + EPSILON, `${name} evidence row ${rowIndex + 1} article ${articleIndex + 1} has vertical overflow`);
             for (const child of article.descendants) {
@@ -406,7 +418,8 @@ describe("responsive layout contract", () => {
               assert.ok(child.rect.top >= article.rect.top - EPSILON && child.rect.bottom <= article.rect.bottom + EPSILON, `${name} evidence text escapes vertically: ${child.text}`);
             }
           }
-          assert.ok(evidence.articles[1].rect.top >= evidence.articles[0].rect.bottom - EPSILON, `${name} evidence row ${rowIndex + 1} remains side-by-side instead of stacking`);
+          assert.ok(Math.abs(evidence.articles[1].rect.top - evidence.articles[0].rect.top) <= EPSILON, `${name} evidence row ${rowIndex + 1} paired articles are not aligned`);
+          assert.ok(evidence.articles[1].rect.left >= evidence.articles[0].rect.right - EPSILON, `${name} evidence row ${rowIndex + 1} paired articles overlap`);
         }
 
         await assertDocumentHasNoHorizontalOverflow(page, `${name} lower cards`);

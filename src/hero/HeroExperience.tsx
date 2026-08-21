@@ -96,13 +96,17 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   float t = clamp((r - DISK_IN) / (DISK_OUT - DISK_IN), 0.0, 1.0);
   float edge = smoothstep(0.0, 0.09, t) * (1.0 - smoothstep(0.70, 1.0, t));
 
-  // Keplerian shear: inner gas laps the outer, so the turbulence winds up.
-  float omega = 1.45 * pow(max(r, DISK_IN), -1.5);
-  float ang = atan(hit.z, hit.x) + uTime * omega;
-  vec2 q = vec2(cos(ang), sin(ang)) * (1.7 + r * 0.44);
+  // Follow a bounded logarithmic spiral through an advecting radial source.
+  // This keeps the morphology stable over long sessions while fresh density
+  // continuously enters through the disk's outer edge and travels inward.
+  float sourceR = r + uTime * 0.035;
+  float ang = atan(hit.z, hit.x)
+    + uTime * 0.10
+    + 1.35 * log(max(sourceR, DISK_IN) / DISK_IN);
+  vec2 q = vec2(cos(ang), sin(ang)) * (1.7 + sourceR * 0.44);
 
-  float turb = fbm(q * 1.9 + vec2(0.0, r * 0.55));
-  float strands = fbm(q * 5.6 - vec2(r * 1.15, 0.0));
+  float turb = fbm(q * 1.9 + vec2(0.0, sourceR * 0.55));
+  float strands = fbm(q * 5.6 - vec2(sourceR * 1.15, 0.0));
   float density = edge * (0.40 + 0.90 * turb) * (0.52 + 0.76 * strands);
   density *= pow(1.0 - t, 0.80);
 
@@ -594,10 +598,19 @@ void main() {
         q.x *= halfW;
         vec3 glow;
         vec3 wax = lavaScene(q, halfW, uTime * uWax, glow);
+        // A cutout cannot inherit a dark frame from the simulation: there is no
+        // solid DOM ink behind it. Keep the moving wax and its dye, but guarantee
+        // a modest post-tonemap emission floor so every glyph remains a light
+        // source even while a gap between blobs crosses it.
+        const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+        float dyePhase = 0.5 + 0.5 * sin(q.x * 0.72 + q.y * 0.31 + uTime * 0.08);
+        vec3 floorTint = mix(vec3(1.00, 0.18, 0.64), vec3(0.12, 0.82, 1.00), dyePhase);
+        vec3 emissionFloor = floorTint * (0.24 * uReveal / max(dot(floorTint, LUMA), 1e-3));
+        vec3 litWax = max(tonemap(wax * uReveal), emissionFloor);
         // The letters are the only light source on a black page, so they carry
         // their own bloom outward and lift at their own edges.
-        vec3 halo = glow * uReveal * (spill * 1.25 + m * (1.0 - m) * 0.55);
-        col = mix(col, tonemap(wax * uReveal), m);
+        vec3 halo = (glow * uReveal + emissionFloor * 0.55) * (spill * 1.25 + m * (1.0 - m) * 0.55);
+        col = mix(col, litWax, m);
         col += halo;
       }
     }
@@ -616,6 +629,7 @@ export type HeroExperienceProps = {
 };
 
 type QualityTier = { dpr: number; octaves: number; steps: number };
+type ContourHit = { x: number; y: number; nx: number; ny: number };
 
 // Index 0 is the ceiling; the frame-time governor walks down from wherever the
 // device probe starts it.
@@ -819,6 +833,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     const soy = new Float32Array(SPARK_MAX);
     const sovx = new Float32Array(SPARK_MAX);
     const sovy = new Float32Array(SPARK_MAX);
+    const sdeflect = new Float32Array(SPARK_MAX);
     let sparkCount = 0;
     let wellX = 0;
     let wellY = 0;
@@ -827,8 +842,16 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     let whipIndex = -1;
     let whipLife = 0;
     let nextWhip = 2.2;
-    // Text boxes the debris bounces off, as [left, bottom, right, top].
-    let obstacles: number[][] = [];
+    // The CTA and console really are rectangles. Headline collision is kept in
+    // a separate live glyph-alpha field below so whitespace, counters and curved
+    // outlines remain physically meaningful.
+    let rectObstacles: number[][] = [];
+    const headlineMaskCanvas = document.createElement("canvas");
+    let headlineMask: Uint8Array | null = null;
+    let headlineMaskLeft = 0;
+    let headlineMaskBottom = 0;
+    let headlineMaskWidth = 0;
+    let headlineMaskHeight = 0;
     let pointerX = 0;
     let pointerY = 0;
     let pointerLife = 0;
@@ -852,6 +875,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       soy[i] = 0;
       sovx[i] = 0;
       sovy[i] = 0;
+      sdeflect[i] = 0;
       // A quarter of the field spirals toward the camera, which is what carries
       // debris out past the headline and off the front of the frame.
       sz[i] = 0;
@@ -861,25 +885,81 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       orbitPlace(i);
     };
 
+    const buildHeadlineCollider = (headline: HTMLElement, canvasRect: DOMRect, scaleX: number, scaleY: number) => {
+      const box = headline.getBoundingClientRect();
+      const pad = 5;
+      const bandLeft = box.left - canvasRect.left - pad;
+      const bandTop = box.top - canvasRect.top - pad;
+      const bandWidth = box.width + pad * 2;
+      const bandHeight = box.height + pad * 2;
+      const width = Math.max(1, Math.ceil(bandWidth * scaleX));
+      const height = Math.max(1, Math.ceil(bandHeight * scaleY));
+      const ctx = headlineMaskCanvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        headlineMask = null;
+        return;
+      }
+
+      headlineMaskCanvas.width = width;
+      headlineMaskCanvas.height = height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#fff";
+
+      // One live Range per character retains the browser's wrapping and letter
+      // spacing. Drawing every text node with its own computed font also covers
+      // the differently styled payoff without turning its line box solid.
+      const walker = document.createTreeWalker(headline, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      while (walker.nextNode()) {
+        const node = walker.currentNode as Text;
+        const parent = node.parentElement;
+        if (!parent) continue;
+        const styles = getComputedStyle(parent);
+        ctx.font = `${styles.fontStyle} ${styles.fontWeight} ${parseFloat(styles.fontSize)}px ${styles.fontFamily}`;
+        const text = node.textContent ?? "";
+        for (let i = 0; i < text.length; i += 1) {
+          if (/\s/.test(text[i])) continue;
+          range.setStart(node, i);
+          range.setEnd(node, i + 1);
+          const glyph = range.getBoundingClientRect();
+          if (glyph.width < 0.5 || glyph.height < 0.5) continue;
+          ctx.save();
+          ctx.translate(
+            (glyph.left + glyph.width / 2 - canvasRect.left - bandLeft) * scaleX,
+            (glyph.top + glyph.height / 2 - canvasRect.top - bandTop) * scaleY,
+          );
+          ctx.scale(scaleX, scaleY);
+          ctx.fillText(text[i], 0, 0);
+          ctx.restore();
+        }
+      }
+
+      const rgba = ctx.getImageData(0, 0, width, height).data;
+      const alpha = new Uint8Array(width * height);
+      for (let i = 0; i < alpha.length; i += 1) alpha[i] = rgba[i * 4 + 3];
+      headlineMask = alpha;
+      headlineMaskLeft = bandLeft * scaleX;
+      headlineMaskBottom = canvas.height - (bandTop + bandHeight) * scaleY;
+      headlineMaskWidth = width;
+      headlineMaskHeight = height;
+    };
+
     const measureObstacles = () => {
       const host = canvas.parentElement;
       const canvasRect = canvas.getBoundingClientRect();
       if (!host || canvasRect.width < 1 || canvasRect.height < 1) return;
       const scaleX = canvas.width / canvasRect.width;
       const scaleY = canvas.height / canvasRect.height;
-      const boxes: DOMRect[] = [];
-      const headline = host.querySelector("h1");
-      if (headline) {
-        // Per-line rects rather than the whole heading block: debris should
-        // glance off the words, not off an invisible column beside them.
-        const range = document.createRange();
-        range.selectNodeContents(headline);
-        boxes.push(...range.getClientRects());
-      }
-      for (const node of host.querySelectorAll<HTMLElement>(".hero-enter, .hero-console")) {
-        boxes.push(node.getBoundingClientRect());
-      }
-      obstacles = boxes
+      const headline = host.querySelector<HTMLElement>("h1");
+      if (headline) buildHeadlineCollider(headline, canvasRect, scaleX, scaleY);
+      else headlineMask = null;
+
+      // These controls are rectangular surfaces; unlike a line box, their
+      // rectangle is their visible contour, so the cheap collider is correct.
+      rectObstacles = [...host.querySelectorAll<HTMLElement>(".hero-enter, .hero-console")]
+        .map((node) => node.getBoundingClientRect())
         .filter((box) => box.width > 8 && box.height > 8)
         .map((box) => {
           const left = (box.left - canvasRect.left) * scaleX;
@@ -889,6 +969,107 @@ export default function HeroExperience({ active, className, onFailure, onReady }
           const bottom = canvas.height - (box.bottom - canvasRect.top) * scaleY;
           return [left, bottom, right, top];
         });
+    };
+
+    const headlineAlpha = (x: number, y: number) => {
+      if (!headlineMask) return 0;
+      const fx = x - headlineMaskLeft;
+      const fy = headlineMaskHeight - 1 - (y - headlineMaskBottom);
+      if (fx < 0 || fy < 0 || fx > headlineMaskWidth - 1 || fy > headlineMaskHeight - 1) return 0;
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const x1 = Math.min(headlineMaskWidth - 1, x0 + 1);
+      const y1 = Math.min(headlineMaskHeight - 1, y0 + 1);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const a00 = headlineMask[y0 * headlineMaskWidth + x0];
+      const a10 = headlineMask[y0 * headlineMaskWidth + x1];
+      const a01 = headlineMask[y1 * headlineMaskWidth + x0];
+      const a11 = headlineMask[y1 * headlineMaskWidth + x1];
+      return (a00 * (1 - tx) + a10 * tx) * (1 - ty) + (a01 * (1 - tx) + a11 * tx) * ty;
+    };
+
+    const contourNormal = (x: number, y: number, fallbackX: number, fallbackY: number) => {
+      const d = 1.25;
+      // Alpha grows into the glyph, so the negative gradient points out.
+      let nx = -(headlineAlpha(x + d, y) - headlineAlpha(x - d, y));
+      let ny = -(headlineAlpha(x, y + d) - headlineAlpha(x, y - d));
+      let length = Math.hypot(nx, ny);
+      if (length < 1e-3) {
+        nx = fallbackX;
+        ny = fallbackY;
+        length = Math.hypot(nx, ny);
+      }
+      if (length < 1e-3) return { nx: 0, ny: 1 };
+      nx /= length;
+      ny /= length;
+      if (nx * fallbackX + ny * fallbackY < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      return { nx, ny };
+    };
+
+    const headlineHit = (fromX: number, fromY: number, toX: number, toY: number, threshold = 48): ContourHit | null => {
+      if (!headlineMask) return null;
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+
+      // A freshly seeded orbit can begin inside a thick stroke. Find its nearest
+      // transparent escape, then use the same contour-normal response as a sweep.
+      if (headlineAlpha(fromX, fromY) >= threshold) {
+        const fallbackAngle = Math.atan2(-dy, -dx);
+        const maxRadius = Math.min(128, Math.max(headlineMaskWidth, headlineMaskHeight));
+        for (let radius = 2; radius <= maxRadius; radius += 2) {
+          for (let direction = 0; direction < 16; direction += 1) {
+            const angle = direction === 0 ? fallbackAngle : direction / 16 * Math.PI * 2;
+            const outsideX = fromX + Math.cos(angle) * radius;
+            const outsideY = fromY + Math.sin(angle) * radius;
+            if (headlineAlpha(outsideX, outsideY) >= threshold) continue;
+            let insideT = 0;
+            let outsideT = 1;
+            for (let iteration = 0; iteration < 8; iteration += 1) {
+              const t = (insideT + outsideT) * 0.5;
+              const x = fromX + (outsideX - fromX) * t;
+              const y = fromY + (outsideY - fromY) * t;
+              if (headlineAlpha(x, y) >= threshold) insideT = t;
+              else outsideT = t;
+            }
+            const x = fromX + (outsideX - fromX) * outsideT;
+            const y = fromY + (outsideY - fromY) * outsideT;
+            const normal = contourNormal(x, y, outsideX - fromX, outsideY - fromY);
+            return { x, y, ...normal };
+          }
+        }
+        return null;
+      }
+
+      // Sweep at sub-pixel-mask intervals. This catches the fast thrown spark
+      // even if it crosses a complete thin stroke between animation frames.
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 1.75));
+      let outsideT = 0;
+      for (let step = 1; step <= steps; step += 1) {
+        const insideT = step / steps;
+        const x = fromX + dx * insideT;
+        const y = fromY + dy * insideT;
+        if (headlineAlpha(x, y) < threshold) {
+          outsideT = insideT;
+          continue;
+        }
+        let low = outsideT;
+        let high = insideT;
+        for (let iteration = 0; iteration < 8; iteration += 1) {
+          const t = (low + high) * 0.5;
+          if (headlineAlpha(fromX + dx * t, fromY + dy * t) >= threshold) high = t;
+          else low = t;
+        }
+        const boundaryT = (low + high) * 0.5;
+        const hitX = fromX + dx * boundaryT;
+        const hitY = fromY + dy * boundaryT;
+        const normal = contourNormal(hitX, hitY, -dx, -dy);
+        return { x: hitX, y: hitY, ...normal };
+      }
+      return null;
     };
 
     const onPointer = (event: PointerEvent) => {
@@ -902,10 +1083,125 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     pointerHost?.addEventListener("pointermove", onPointer, { passive: true });
     pointerHost?.addEventListener("pointerdown", onPointer, { passive: true });
 
+    const isHeadlineClear = (x: number, y: number) => {
+      const d = 1.25;
+      return headlineAlpha(x, y) < 8
+        && headlineAlpha(x + d, y) < 8
+        && headlineAlpha(x - d, y) < 8
+        && headlineAlpha(x, y + d) < 8
+        && headlineAlpha(x, y - d) < 8;
+    };
+
+    const clearHeadlineContact = (hit: ContourHit, i: number) => {
+      const phase = i * 0.618033988749895 % 1;
+      const normalAngle = Math.atan2(hit.ny, hit.nx);
+      const preferredRadius = 4 + phase * 6;
+      // A long normal step can jump from one letter into the next. Search a
+      // small outward fan and accept only a genuinely transparent destination;
+      // the binary-refined contact itself is the guaranteed-safe fallback.
+      for (let ring = 0; ring < 7; ring += 1) {
+        const radius = preferredRadius + ring * 4;
+        for (let direction = 0; direction < 9; direction += 1) {
+          const step = Math.ceil(direction / 2);
+          const sign = direction % 2 ? 1 : -1;
+          const angle = normalAngle + step * sign * 0.28;
+          const x = hit.x + Math.cos(angle) * radius;
+          const y = hit.y + Math.sin(angle) * radius;
+          if (isHeadlineClear(x, y)) return { x, y };
+        }
+      }
+      return { x: hit.x, y: hit.y };
+    };
+
+    const deflectHeadline = (
+      i: number,
+      fromX: number,
+      fromY: number,
+      targetX: number,
+      targetY: number,
+      projection: number,
+      dt: number,
+      whipping: boolean,
+      threshold = 48,
+    ) => {
+      const hit = headlineHit(fromX, fromY, targetX, targetY, threshold);
+      if (!hit) return false;
+
+      // Point sprites have area, and a small per-particle radius keeps several
+      // simultaneous contacts from sharing one mathematical contour pixel.
+      const corrected = clearHeadlineContact(hit, i);
+      // `drawSparks` projects approaching debris toward the viewer. Map the
+      // visible contour response back into orbit space so the point that is
+      // uploaded to WebGL—not only its unprojected state—clears the glyph.
+      sx[i] = wellX + (corrected.x - wellX) / projection;
+      sy[i] = wellY + (corrected.y - wellY) / projection;
+      const minSide = Math.min(canvas.width, canvas.height);
+      const tangentX = -hit.ny;
+      const tangentY = hit.nx;
+      if (whipping) {
+        let velocityX = svx[i] * projection;
+        let velocityY = svy[i] * projection;
+        const normalVelocity = velocityX * hit.nx + velocityY * hit.ny;
+        if (normalVelocity < 0) {
+          velocityX -= 1.82 * normalVelocity * hit.nx;
+          velocityY -= 1.82 * normalVelocity * hit.ny;
+        }
+        const outgoingNormal = velocityX * hit.nx + velocityY * hit.ny;
+        const outwardFloor = minSide * 0.22;
+        if (outgoingNormal < outwardFloor) {
+          velocityX += hit.nx * (outwardFloor - outgoingNormal);
+          velocityY += hit.ny * (outwardFloor - outgoingNormal);
+        }
+        const tangentVelocity = velocityX * tangentX + velocityY * tangentY;
+        const tangentSign = Math.abs(tangentVelocity) > 1 ? Math.sign(tangentVelocity) : (i % 2 ? 1 : -1);
+        velocityX += tangentX * tangentSign * minSide * 0.08;
+        velocityY += tangentY * tangentSign * minSide * 0.08;
+        svx[i] = velocityX / projection;
+        svy[i] = velocityY / projection;
+        sdeflect[i] = 0.7;
+        sflash[i] = 1.6;
+        return true;
+      }
+
+      // Orbital positions are reconstructed every frame, so preserve the
+      // contour contact in the perturbation and reflect the actual incoming
+      // screen velocity into that perturbation rather than snapping an axis.
+      const baseX = wellX + Math.cos(sa[i]) * sr[i];
+      const flat = Math.max(0.10, Math.sin(Math.abs(viewIncl * heroParams.tilt)));
+      const baseY = wellY + Math.sin(sa[i]) * sr[i] * flat;
+      sox[i] = sx[i] - baseX;
+      soy[i] = sy[i] - baseY;
+      const inverseDt = 1 / Math.max(dt, 1 / 240);
+      let velocityX = (targetX - fromX) * inverseDt;
+      let velocityY = (targetY - fromY) * inverseDt;
+      const normalVelocity = velocityX * hit.nx + velocityY * hit.ny;
+      if (normalVelocity < 0) {
+        velocityX -= 1.72 * normalVelocity * hit.nx;
+        velocityY -= 1.72 * normalVelocity * hit.ny;
+      }
+      const outgoingNormal = velocityX * hit.nx + velocityY * hit.ny;
+      const outwardFloor = minSide * 0.12;
+      if (outgoingNormal < outwardFloor) {
+        velocityX += hit.nx * (outwardFloor - outgoingNormal);
+        velocityY += hit.ny * (outwardFloor - outgoingNormal);
+      }
+      const tangentVelocity = velocityX * tangentX + velocityY * tangentY;
+      const tangentSign = Math.abs(tangentVelocity) > 1 ? Math.sign(tangentVelocity) : (i % 2 ? 1 : -1);
+      const contourGlide = minSide * (0.075 + i % 5 * 0.008);
+      velocityX += tangentX * tangentSign * contourGlide;
+      velocityY += tangentY * tangentSign * contourGlide;
+      sovx[i] = velocityX / projection;
+      sovy[i] = velocityY / projection;
+      sdeflect[i] = 0.7;
+      sflash[i] = 1;
+      orbitPlace(i);
+      return true;
+    };
+
     // The thrown spark is the one piece of debris off its orbit, so it carries a
-    // real velocity and reflects off the words it crosses.
-    const bounceWhip = (i: number) => {
-      for (const box of obstacles) {
+    // real velocity. Rectangular furniture still uses its literal box contour.
+    const bounceRectWhip = (i: number) => {
+      for (const box of rectObstacles) {
         if (sx[i] < box[0] || sx[i] > box[2] || sy[i] < box[1] || sy[i] > box[3]) continue;
         const toLeft = sx[i] - box[0];
         const toRight = box[2] - sx[i];
@@ -921,9 +1217,9 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       }
     };
 
-    const bounceSpark = (i: number) => {
+    const bounceRectSpark = (i: number) => {
       const kick = Math.min(canvas.width, canvas.height) * 0.09;
-      for (const box of obstacles) {
+      for (const box of rectObstacles) {
         if (sx[i] < box[0] || sx[i] > box[2] || sy[i] < box[1] || sy[i] > box[3]) continue;
         const toLeft = sx[i] - box[0];
         const toRight = box[2] - sx[i];
@@ -940,6 +1236,21 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         orbitPlace(i);
         return;
       }
+    };
+
+    const deflectSpark = (
+      i: number,
+      fromX: number,
+      fromY: number,
+      targetX: number,
+      targetY: number,
+      projection: number,
+      dt: number,
+      whipping: boolean,
+    ) => {
+      if (deflectHeadline(i, fromX, fromY, targetX, targetY, projection, dt, whipping)) return;
+      if (whipping) bounceRectWhip(i);
+      else bounceRectSpark(i);
     };
 
     const stepSparks = (dt: number, energy: number) => {
@@ -973,15 +1284,28 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       const orbitK = Math.sqrt(wellPull) * (0.55 + 0.55 * energy);
 
       for (let i = 0; i < sparkCount; i += 1) {
+        const fromX = sx[i];
+        const fromY = sy[i];
+        const fromProjection = 1 + Math.max(0, sz[i]) * 1.9;
+        const visibleFromX = wellX + (fromX - wellX) * fromProjection;
+        const visibleFromY = wellY + (fromY - wellY) * fromProjection;
         if (i === whipIndex && whipLife > 0) {
           sx[i] += svx[i] * dt;
           sy[i] += svy[i] * dt;
-          bounceWhip(i);
+          const projection = 1 + Math.max(0, sz[i]) * 1.9;
+          const visibleX = wellX + (sx[i] - wellX) * projection;
+          const visibleY = wellY + (sy[i] - wellY) * projection;
+          deflectSpark(i, visibleFromX, visibleFromY, visibleX, visibleY, projection, dt, true);
         } else {
           sa[i] += (orbitK / Math.pow(Math.max(sr[i], minSide * 0.12), 1.5)) * dt;
-          // Spring, not free flight: a disturbed spark returns to its orbit.
-          sovx[i] += (-sox[i] * 16.0 - sovx[i] * 3.2) * dt;
-          sovy[i] += (-soy[i] * 16.0 - sovy[i] * 3.2) * dt;
+          // A contour hit gets a short ballistic release before the orbit spring
+          // gathers it again; otherwise the spring presses many sparks straight
+          // back onto the same vertical stem and recreates an edge stack.
+          sdeflect[i] = Math.max(0, sdeflect[i] - dt);
+          const spring = sdeflect[i] > 0 ? 2.4 : 16.0;
+          const damping = sdeflect[i] > 0 ? 0.65 : 3.2;
+          sovx[i] += (-sox[i] * spring - sovx[i] * damping) * dt;
+          sovy[i] += (-soy[i] * spring - sovy[i] * damping) * dt;
           sox[i] += sovx[i] * dt;
           soy[i] += sovy[i] * dt;
           sz[i] += szv[i] * dt;
@@ -1004,7 +1328,10 @@ export default function HeroExperience({ active, className, onFailure, onReady }
             }
           }
 
-          bounceSpark(i);
+          const projection = 1 + Math.max(0, sz[i]) * 1.9;
+          const visibleX = wellX + (sx[i] - wellX) * projection;
+          const visibleY = wellY + (sy[i] - wellY) * projection;
+          deflectSpark(i, visibleFromX, visibleFromY, visibleX, visibleY, projection, dt, false);
         }
 
         const off = sx[i] < -margin || sx[i] > width + margin || sy[i] < -margin || sy[i] > height + margin;
@@ -1037,8 +1364,18 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         const depth = -Math.sin(sa[i]);
         // Approaching debris is pushed away from the well on screen as well as
         // scaled up, so it sweeps out past the headline toward the viewer.
-        const x = wellX + (sx[i] - wellX) * (1 + near * 1.9);
-        const y = wellY + (sy[i] - wellY) * (1 + near * 1.9);
+        const projection = 1 + near * 1.9;
+        let x = wellX + (sx[i] - wellX) * projection;
+        let y = wellY + (sy[i] - wellY) * projection;
+        // Final visible-coordinate guard. Respawns and changing depth can move a
+        // projected point between simulation samples; resolve that exact uploaded
+        // center through the same contour response before WebGL ever sees it.
+        for (let attempt = 0; attempt < 2 && !isHeadlineClear(x, y); attempt += 1) {
+          const whipping = i === whipIndex && whipLife > 0;
+          if (!deflectHeadline(i, x, y, x, y, projection, 1 / 60, whipping, 8)) break;
+          x = wellX + (sx[i] - wellX) * projection;
+          y = wellY + (sy[i] - wellY) * projection;
+        }
         const size = Math.min(30, dpr * (1.7 + depth * 0.9 + near * 9.5) * (1 + sflash[i] * 0.7));
         const gain = (0.5 + 0.7 * energy) * (0.42 + 0.58 * (depth * 0.5 + 0.5)) * (1 + sflash[i] * 1.6) * (1 - near * 0.3) * reveal;
         writeSpark(slot, x, y, size, SPARK_COLORS[shue[i]], gain);
@@ -1216,8 +1553,13 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     };
 
     resize();
-    // Mona Sans swapping in re-lays out the payoff, so the mask must follow it.
-    document.fonts?.ready.then(() => { if (!disposed) buildMask(); }).catch(() => {});
+    // Mona Sans swapping in re-lays out both the payoff and the physical glyph
+    // contours, so both masks must follow it.
+    document.fonts?.ready.then(() => {
+      if (disposed) return;
+      buildMask();
+      measureObstacles();
+    }).catch(() => {});
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
 

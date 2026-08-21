@@ -230,7 +230,7 @@ describe("mobile-first executive one-pager interactions", () => {
     try {
       await page.locator("#contact").scrollIntoViewIfNeeded();
       await page.getByRole("button", { name: /Copy email/ }).click();
-      const status = page.getByRole("status");
+      const status = page.locator('.toast [role="status"]');
       await status.waitFor({ state: "visible" });
       assert.match(await status.textContent(), /Email/i);
 
