@@ -3,7 +3,7 @@ import { after, before, describe, test } from "node:test";
 import { launch, openPage } from "../scripts/lib/capture.mjs";
 import { startSite } from "../scripts/lib/site-server.mjs";
 
-describe("mobile-first executive one-pager interactions", () => {
+describe("mobile-first presentation interactions", () => {
   let site;
   let browser;
 
@@ -18,231 +18,180 @@ describe("mobile-first executive one-pager interactions", () => {
   });
 
   function pageFor(viewport = { width: 390, height: 844 }) {
-    return openPage(browser, {
-      url: site.url,
-      viewport,
-      fx: "motion",
-    });
+    return openPage(browser, { url: site.url, viewport, fx: "motion" });
   }
 
-  test("opening teaser stays focused and links into the partnership", async () => {
+  test("hero is a focused story with an optional simulation console", async () => {
     const { page, context } = await pageFor();
     try {
-      const hero = page.locator(".hero");
-      assert.match((await hero.getByRole("heading", { level: 1 }).textContent()) ?? "", /We turn IP into worlds people can\s+play, collect, and grow\./);
-      const spectacleLayers = hero.locator('.hero-grid[aria-hidden="true"], .hero-orbit[aria-hidden="true"], .hero-light-field[aria-hidden="true"]');
-      assert.equal(await spectacleLayers.count(), 3);
-      assert.deepEqual(await spectacleLayers.evaluateAll((layers) => layers.map((layer) => getComputedStyle(layer).pointerEvents)), ["none", "none", "none"]);
-      assert.equal(await hero.locator("img").count(), 0);
-      assert.equal(await hero.locator("button").count(), 0);
-      assert.equal(await hero.locator(".hero-scene-nav").count(), 0);
-      assert.equal(await hero.getAttribute("data-scene"), null);
-      assert.doesNotMatch((await hero.textContent()) ?? "", /Tetris|Apple Arcade|shipped together|B\+S/i);
-      const payoff = hero.locator('.hero-payoff[data-color-flow="payoff"]');
-      assert.equal(await payoff.count(), 1);
-      assert.equal((await payoff.textContent())?.trim(), "play, collect, and grow.");
-      assert.equal(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), true);
-      assert.equal(await hero.evaluate((node) => node.getAnimations({ subtree: true }).filter((animation) => animation.playState === "running").length), 0);
-
-      const partnershipLink = hero.locator('a[href="#team"]');
-      assert.equal(await partnershipLink.count(), 1);
-      assert.equal(await partnershipLink.evaluate((link) => link.tagName), "A");
-      assert.equal(
-        (await partnershipLink.locator("span").textContent())?.replace(/\s+/g, " ").trim(),
-        "Super-Powers Combined",
-        "the teaser CTA must use the approved executive-facing label",
+      const hero = page.locator("#top");
+      assert.match(
+        (await hero.getByRole("heading", { level: 1 }).textContent())?.replace(/\s+/g, " ") ?? "",
+        /WE TURN IP INTO\s*WORLDS PEOPLE CAN\s*PLAY, COLLECT, AND GROW\./,
       );
-      await partnershipLink.focus();
-      await page.keyboard.press("Enter");
-      await page.waitForFunction(() => window.location.hash === "#team");
-      assert.equal(await page.evaluate(() => window.location.hash), "#team");
-      assert.equal(await page.locator("#team .leader-card").count(), 2);
+      assert.equal(await hero.locator(".hero-universe[aria-hidden='true']").count(), 1);
+      assert.equal(await hero.locator(".front-particles[aria-hidden='true'] i").count(), 4);
+      assert.equal(await hero.locator(".hero-enter, .hero-signals, .hero-scene-nav").count(), 0);
+
+      const toggle = hero.locator(".simulation-toggle");
+      assert.equal((await toggle.textContent())?.trim(), "PLAY WITH THE SIMULATION");
+      assert.equal(await toggle.getAttribute("aria-expanded"), "false");
+      await toggle.click();
+      assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+      assert.equal(await hero.locator(".hero-controls input[type='range']").count() > 0, true);
+      assert.equal((await toggle.textContent())?.trim(), "RETURN TO THE STORY");
+      await toggle.click();
+      assert.equal(await toggle.getAttribute("aria-expanded"), "false");
     } finally {
       await context.close();
     }
   });
 
-  test("visible identity copy consistently styles the given names as BRADD and STONE", async () => {
+  test("wheel input advances the single presentation scroll root", async () => {
     const { page, context } = await pageFor();
     try {
-      const displayedNames = await page.locator("#team .leader-copy > strong").allTextContents();
-      assert.deepEqual(displayedNames, ["BRADD McBrearty", "STONE Perales"]);
-
-      const mixedCaseNames = await page.evaluate(() => {
-        const offenders = [];
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-        while (walker.nextNode()) {
-          const node = walker.currentNode;
-          const text = node.textContent?.replace(/\s+/g, " ").trim() ?? "";
-          if (!/\b(?:Bradd|Stone)\b/.test(text)) continue;
-          const element = node.parentElement;
-          if (!element || element.closest('[aria-hidden="true"], script, style, noscript, dialog:not([open])')) continue;
-
-          let hidden = false;
-          for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
-            const style = getComputedStyle(ancestor);
-            if (style.display === "none" || style.visibility === "hidden") {
-              hidden = true;
-              break;
-            }
-          }
-          if (!hidden) offenders.push(text);
-        }
-        return [...new Set(offenders)];
-      });
-      assert.deepEqual(mixedCaseNames, [], `visible copy contains mixed-case given names: ${mixedCaseNames.join(" | ")}`);
-    } finally {
-      await context.close();
-    }
-  });
-
-  test("hero motion runs onscreen and fully pauses offscreen", async () => {
-    const { page, context } = await openPage(browser, {
-      url: site.url,
-      viewport: { width: 390, height: 844 },
-      fx: "motion",
-      live: true,
-    });
-    try {
-      const hero = page.locator(".hero");
-      await page.waitForFunction(() => document.querySelector(".hero")?.getAttribute("data-motion") === "active");
-      assert.equal(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), false);
-
-      const onscreenAnimations = await hero.evaluate((node) => node.getAnimations({ subtree: true }).map((animation) => ({
-        name: animation.animationName,
-        playState: animation.playState,
-      })));
-      assert.deepEqual(
-        onscreenAnimations.map(({ name }) => name).sort(),
-        ["hero-orbit-settle", "hero-payoff-flow", "hero-trace-x", "hero-trace-y"].sort(),
-      );
-      assert.equal(onscreenAnimations.every(({ playState }) => playState === "running"), true, JSON.stringify(onscreenAnimations));
-
-      await page.locator("#contact").scrollIntoViewIfNeeded();
-      await page.waitForFunction(() => document.querySelector(".hero")?.getAttribute("data-motion") === "paused");
-      const offscreenAnimations = await hero.evaluate((node) => node.getAnimations({ subtree: true }).map((animation) => ({
-        name: animation.animationName,
-        playState: animation.playState,
-      })));
-      assert.equal(offscreenAnimations.some(({ playState }) => playState === "running"), false, JSON.stringify(offscreenAnimations));
-    } finally {
-      await context.close();
-    }
-  });
-
-  test("wheel input scrolls the page instead of being captured by the hero", async () => {
-    const { page, context } = await pageFor();
-    try {
-      assert.equal(await page.locator(".hero").getAttribute("data-scene"), null);
+      const deck = page.locator("main.presentation");
+      assert.equal(await deck.evaluate((node) => node.scrollTop), 0);
       assert.equal(await page.evaluate(() => window.scrollY), 0);
       await page.mouse.move(195, 420);
-      await page.mouse.wheel(0, 520);
-      await page.waitForTimeout(250);
-      assert.ok(await page.evaluate(() => window.scrollY > 100), "wheel input did not move the document");
-      assert.equal(await page.locator(".hero-scene-nav").count(), 0);
+      await page.mouse.wheel(0, 620);
+      await page.waitForTimeout(450);
+      assert.ok(await deck.evaluate((node) => node.scrollTop > 100), "wheel input did not advance the presentation");
+      assert.equal(await page.evaluate(() => window.scrollY), 0, "the document should not become a second scroll root");
     } finally {
       await context.close();
     }
   });
 
-  test("range tabs use roving focus and swap real evidence imagery", async () => {
+  test("Explore rolls down beneath the persistent header and Connect lands on contact", async () => {
     const { page, context } = await pageFor();
     try {
-      await page.locator("#range").scrollIntoViewIfNeeded();
-      const play = page.locator("#tab-play");
-      await play.focus();
+      const header = page.locator(".topbar");
+      const explore = header.getByRole("button", { name: /EXPLORE/ });
+      await explore.click();
+      assert.equal(await explore.getAttribute("aria-expanded"), "true");
 
-      await page.keyboard.press("ArrowRight");
-      assert.equal(await page.evaluate(() => document.activeElement?.id), "tab-collect");
-      assert.equal(await page.locator("#tab-collect").getAttribute("aria-selected"), "true");
-      assert.match(await page.locator(".range-visual img").getAttribute("src"), /stone-raid-hires\.webp$/);
+      const panel = page.locator(".explore-rollout.is-open");
+      await panel.waitFor({ state: "visible" });
+      assert.equal(await panel.getByRole("navigation", { name: "Explore the presentation" }).getByRole("button").count(), 6);
+      const geometry = await page.evaluate(() => {
+        const headerBox = document.querySelector(".topbar")?.getBoundingClientRect();
+        const panelBox = document.querySelector(".explore-rollout.is-open")?.getBoundingClientRect();
+        return { headerBottom: headerBox?.bottom ?? 0, panelTop: panelBox?.top ?? -1 };
+      });
+      assert.ok(Math.abs(geometry.panelTop - geometry.headerBottom) <= 2, JSON.stringify(geometry));
 
-      await page.keyboard.press("End");
-      assert.equal(await page.evaluate(() => document.activeElement?.id), "tab-grow");
-      assert.match(await page.locator(".range-visual img").getAttribute("src"), /stone-chaotic-hires\.webp$/);
-
-      await page.keyboard.press("Home");
-      assert.equal(await page.evaluate(() => document.activeElement?.id), "tab-play");
-      assert.match(await page.locator(".range-visual img").getAttribute("src"), /ultimate-rivals-hires\.webp$/);
-      assert.ok(await page.locator(".range-visual img").getAttribute("alt"));
+      await page.keyboard.press("Escape");
+      assert.equal(await explore.getAttribute("aria-expanded"), "false");
+      await header.getByRole("button", { name: /CONNECT/ }).click();
+      await page.waitForFunction(() => document.querySelector("#contact")?.getBoundingClientRect().top === 0);
+      assert.match((await page.locator(".presentation-cue").textContent()) ?? "", /11 \/ 11/);
     } finally {
       await context.close();
     }
   });
 
-  test("later Tetris proof opens a complete, viewport-safe disclosure and restores focus", async () => {
+  test("both leader cards are static, simultaneous, and use the current BRADD portrait", async () => {
     const { page, context } = await pageFor();
     try {
-      await page.locator("#proof").scrollIntoViewIfNeeded();
-      const opener = page.locator("#proof").getByRole("button", { name: "Open the complete Tetris Beat joint case file" });
-      assert.equal(await opener.count(), 1);
+      await page.locator("#team").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      const cards = page.locator("#team .leader-card");
+      assert.equal(await cards.count(), 2);
+      assert.deepEqual(await cards.locator("h3 b").allTextContents(), ["BRADD", "STONE"]);
+      assert.match(await cards.first().locator("img").getAttribute("src"), /bradd-headshot-2026\.webp$/);
+      assert.equal(await page.locator("#team .leader-deck, #team .leader-deck-cue").count(), 0);
+      const grid = await page.locator("#team .leader-grid").evaluate((node) => ({
+        clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+      }));
+      assert.ok(grid.scrollWidth <= grid.clientWidth + 1, JSON.stringify(grid));
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("ecosystem tabs swap one stage without creating a horizontal route", async () => {
+    const { page, context } = await pageFor();
+    try {
+      await page.locator("#range").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      const tabs = page.getByRole("tablist", { name: "Ecosystem lenses" }).getByRole("tab");
+      assert.equal(await tabs.count(), 3);
+      await tabs.nth(1).click();
+      assert.equal(await tabs.nth(1).getAttribute("aria-selected"), "true");
+      assert.match(await page.locator("#range [role='tabpanel'] img").getAttribute("src"), /stone-raid-hires\.webp$/);
+      await tabs.nth(2).click();
+      assert.match(await page.locator("#range [role='tabpanel'] img").getAttribute("src"), /stone-chaotic-hires\.webp$/);
+      assert.equal(await page.locator("#range").getByRole("button", { name: /HERE'S HOW/ }).count(), 1);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("partner and case selectors are compact, complete, and update one detail stage", async () => {
+    const { page, context } = await pageFor();
+    try {
+      await page.locator("#industry-proof").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      const partners = page.locator("#industry-proof .partner-selector button");
+      assert.equal(await partners.count(), 12);
+      assert.equal(await partners.first().getAttribute("aria-pressed"), "true");
+      await partners.nth(1).click();
+      assert.equal(await partners.nth(1).getAttribute("aria-pressed"), "true");
+      assert.notEqual((await page.locator(".partner-detail h3").textContent())?.trim(), "Apple");
+
+      await page.locator("#work").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      const cases = page.locator("#work .case-selector button");
+      assert.equal(await cases.count(), 6);
+      const firstTitle = (await page.locator(".featured-case h3").textContent())?.trim();
+      await cases.nth(1).click();
+      assert.equal(await cases.nth(1).getAttribute("aria-pressed"), "true");
+      assert.notEqual((await page.locator(".featured-case h3").textContent())?.trim(), firstTitle);
+      assert.equal(await page.locator("#work").getByRole("button", { name: /OPEN COMPLETE CASE FILE/ }).count(), 1);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("detail article is history-aware, scrollable, and restores its opener", async () => {
+    const { page, context } = await pageFor();
+    try {
+      await page.locator("#proof").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      const opener = page.locator("#proof .proof-case-link");
+      await opener.focus();
       await opener.click();
-      const dialog = page.locator(".detail-dialog[open]");
-      await dialog.waitFor({ state: "visible" });
-      await page.waitForTimeout(320);
-
-      assert.equal(await dialog.getAttribute("aria-modal"), "true");
-      assert.equal(await dialog.getAttribute("aria-describedby"), "detail-summary");
-      for (const heading of ["01 / The situation", "02 / Why it matters", "03 / How we lead it", "04 / Evidence in context"]) {
-        assert.equal(await dialog.getByRole("heading", { name: heading }).count(), 1);
+      const article = page.locator(".detail-surface[role='dialog'] .detail-article");
+      await article.waitFor({ state: "visible" });
+      assert.equal(await page.locator(".site-chrome").getAttribute("inert"), "");
+      const dialog = page.locator(".detail-surface[role='dialog']");
+      await dialog.focus();
+      await page.keyboard.press("Shift+Tab");
+      assert.equal(await dialog.evaluate((node) => node.contains(document.activeElement)), true);
+      assert.ok(await article.evaluate((node) => node.scrollHeight > node.clientHeight));
+      assert.equal(await page.evaluate(() => history.state?.braddStoneDetail), true);
+      for (const heading of ["Situation", "How it was led", "Evidence and results", "Why it matters", "Source context"]) {
+        assert.equal(await article.getByText(heading, { exact: true }).count(), 1);
       }
-      const dialogText = (await dialog.textContent()) ?? "";
-      assert.doesNotMatch(dialogText, /Attribution note/i);
-      assert.doesNotMatch(dialogText, /rather than independently audited product claims/i);
 
-      const fits = await dialog.locator("[data-fit-check]").evaluate((node) => {
-        const rect = node.getBoundingClientRect();
-        return rect.left >= 0 && rect.top >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
-      });
-      assert.equal(fits, true);
-
-      await page.keyboard.press("Escape");
-      await dialog.waitFor({ state: "hidden" });
-      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Open the complete Tetris Beat joint case file");
+      await page.goBack({ waitUntil: "commit" }).catch(() => null);
+      await page.locator(".detail-surface").waitFor({ state: "detached" });
+      assert.equal(await opener.evaluate((node) => node === document.activeElement), true);
     } finally {
       await context.close();
     }
   });
 
-  test("presentation navigation opens as a modal, navigates, and restores its trigger", async () => {
+  test("copy email reports a viewport-safe live status", async () => {
     const { page, context } = await pageFor();
     try {
-      const trigger = page.getByRole("button", { name: "Open presentation navigation" });
-      await trigger.click();
-      const dialog = page.locator(".nav-dialog[open]");
-      await dialog.waitFor({ state: "visible" });
-
-      assert.equal(await trigger.getAttribute("aria-expanded"), "true");
-      assert.equal(await dialog.getByRole("navigation", { name: "Presentation chapters" }).getByRole("link").count(), 5);
-      assert.equal(await dialog.getByRole("link", { name: /Start a conversation/ }).count(), 1);
-
-      await page.keyboard.press("Escape");
-      await dialog.waitFor({ state: "hidden" });
-      assert.equal(await trigger.getAttribute("aria-expanded"), "false");
-      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Open presentation navigation");
-    } finally {
-      await context.close();
-    }
-  });
-
-  test("copy-email feedback is a dismissible viewport-safe live toast", async () => {
-    const { page, context } = await pageFor();
-    try {
-      await page.locator("#contact").scrollIntoViewIfNeeded();
-      await page.getByRole("button", { name: /Copy email/ }).click();
-      const status = page.locator('.toast [role="status"]');
-      await status.waitFor({ state: "visible" });
-      assert.match(await status.textContent(), /Email/i);
-
-      const toast = page.locator(".toast[data-fit-check]");
-      const fits = await toast.evaluate((node) => {
+      await page.locator("#contact").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      await page.getByRole("button", { name: /COPY EMAIL/ }).click();
+      const status = page.locator(".notice[role='status']");
+      await page.waitForFunction(() => document.querySelector(".notice")?.classList.contains("is-visible"));
+      assert.match((await status.textContent()) ?? "", /EMAIL|OPENING/);
+      const fits = await status.evaluate((node) => {
         const rect = node.getBoundingClientRect();
-        return rect.left >= 0 && rect.top >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
+        return rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;
       });
       assert.equal(fits, true);
-
-      await page.getByRole("button", { name: "Dismiss notification" }).click();
-      await toast.waitFor({ state: "hidden" });
     } finally {
       await context.close();
     }

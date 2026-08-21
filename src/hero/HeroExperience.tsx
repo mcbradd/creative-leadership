@@ -551,7 +551,7 @@ void main() {
   float aspect = uRes.x / uRes.y;
   vec2 sc = vec2(vNdc.x * aspect, vNdc.y) - uCenter;
 
-  float az = uTime * 0.011;
+  float az = uTime * (0.007 + uWax * 0.004);
   float ci = cos(uIncl);
   vec3 ro = vec3(sin(az) * ci, sin(uIncl), cos(az) * ci) * 15.5;
   vec3 fwd = normalize(-ro);
@@ -568,51 +568,18 @@ void main() {
   col *= uExposure * uReveal;
   col = tonemap(col);
 
-  // The payoff line is a cutout: the glyph mask swaps the backdrop for the wax.
-  // The mask spans only the payoff band, which is what lets it be rasterised
-  // well above framebuffer resolution and keeps the glyph edges off the grid.
+  // Keep the glyph mask available to the shared physics system while leaving
+  // the visible lettering to crisp DOM typography. The previous wax/bloom
+  // composite made the payoff muddy and competed with the accretion field.
   if (uLavaRect.z > 0.5) {
     vec2 mq = (gl_FragCoord.xy - uMaskRect.xy) / uMaskRect.zw;
     if (mq.x > 0.0 && mq.x < 1.0 && mq.y > 0.0 && mq.y < 1.0) {
       vec2 muv = vec2(mq.x, 1.0 - mq.y);
       float m = texture(uMask, muv).r;
-
-      // Bloom read straight off the mip chain: each level is already a box
-      // blur of the one below, so three taps give a smooth falloff. Ring taps
-      // at these radii only ever produced eight displaced copies of the word.
-      // Fractional levels so the hardware interpolates between mips: whole
-      // high levels are box averages and their halo comes back rectangular.
-      float bloom = textureLod(uMask, muv, 1.2).r * 0.55
-                  + textureLod(uMask, muv, 2.6).r * 0.85
-                  + textureLod(uMask, muv, 4.1).r * 1.15;
-      bloom = clamp(bloom, 0.0, 1.0);
-      // Strictly outside the glyph: bloom over the letters only blows them out.
-      float spill = clamp(bloom - m, 0.0, 1.0);
-
-      if (m > 0.002 || spill > 0.002) {
-        vec2 q = (gl_FragCoord.xy - uLavaRect.xy) / uLavaRect.zw * 2.0 - 1.0;
-        // Aspect-corrected: mapping a wide, short payoff box onto a square tube
-        // stretched every blob sideways, which is what read as wax sliding
-        // left and right across the letters instead of rising.
-        float halfW = max(1.0, uLavaRect.z / max(uLavaRect.w, 1.0));
-        q.x *= halfW;
-        vec3 glow;
-        vec3 wax = lavaScene(q, halfW, uTime * uWax, glow);
-        // A cutout cannot inherit a dark frame from the simulation: there is no
-        // solid DOM ink behind it. Keep the moving wax and its dye, but guarantee
-        // a modest post-tonemap emission floor so every glyph remains a light
-        // source even while a gap between blobs crosses it.
-        const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
-        float dyePhase = 0.5 + 0.5 * sin(q.x * 0.72 + q.y * 0.31 + uTime * 0.08);
-        vec3 floorTint = mix(vec3(1.00, 0.18, 0.64), vec3(0.12, 0.82, 1.00), dyePhase);
-        vec3 emissionFloor = floorTint * (0.24 * uReveal / max(dot(floorTint, LUMA), 1e-3));
-        vec3 litWax = max(tonemap(wax * uReveal), emissionFloor);
-        // The letters are the only light source on a black page, so they carry
-        // their own bloom outward and lift at their own edges.
-        vec3 halo = (glow * uReveal + emissionFloor * 0.55) * (spill * 1.25 + m * (1.0 - m) * 0.55);
-        col = mix(col, litWax, m);
-        col += halo;
-      }
+      // This tiny guard only darkens pixels physically behind opaque DOM ink.
+      // It keeps the mask uniform active for the collision pipeline without
+      // drawing a second, blurred copy of the headline.
+      col *= 1.0 - m * 0.025;
     }
   }
   col += (hud(gl_FragCoord.xy, uTime) + hudMarks(gl_FragCoord.xy, uRes, uTime)) * uReveal;
@@ -633,9 +600,9 @@ type ContourHit = { x: number; y: number; nx: number; ny: number };
 
 // Index 0 is the ceiling; the frame-time governor walks down from wherever the
 // device probe starts it.
-// Debris layer. Points rather than another fullscreen pass: the interesting
-// part is what the shader cannot see, namely the live text boxes and the
-// pointer, so the motion is solved on the CPU and only drawn here.
+// Debris layer. Points rather than another fullscreen pass: a quiet orbital
+// field establishes depth while a fixed eight-spark subset can acknowledge the
+// live headline and pointer, so interaction never turns the whole field noisy.
 const SPARK_VERTEX_SOURCE = `#version 300 es
 precision highp float;
 layout(location = 0) in vec2 aPos;
@@ -660,9 +627,11 @@ void main() {
   fragColor = vec4(vColor * falloff * falloff, 1.0);
 }`;
 
-// One spark budget per quality tier, same index as QUALITY_TIERS.
-const SPARK_COUNTS = [460, 360, 260, 170, 110];
-const SPARK_MAX = 460;
+// One deliberately sparse spark budget per quality tier, same index as
+// QUALITY_TIERS. The first eight indices are the stable interactive subset.
+const GLYPH_COLLIDER_SPARKS = 8;
+const SPARK_COUNTS = [180, 144, 112, 80, 56];
+const SPARK_MAX = 180;
 const SPARK_TRAIL = 6;
 const SPARK_VERTS = SPARK_MAX + SPARK_TRAIL * 4;
 const SPARK_COLORS = [
@@ -819,6 +788,8 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     }
 
     // Spark state, all in framebuffer pixels with y pointing up like gl_FragCoord.
+    // Indices 0–7 remain the only typography/pointer actors at every tier; the
+    // rest preserve their Keplerian field instead of being kicked by the UI.
     const sx = new Float32Array(SPARK_MAX);
     const sy = new Float32Array(SPARK_MAX);
     const svx = new Float32Array(SPARK_MAX);
@@ -1262,12 +1233,13 @@ export default function HeroExperience({ active, className, onFailure, onReady }
 
       whipLife = Math.max(0, whipLife - dt);
       nextWhip -= dt;
-      if (nextWhip <= 0 && sparkCount > 0) {
-        // One spark at a time gets thrown across the frame, so the field never
-        // settles into a loop the eye can memorise.
+      const interactiveCount = Math.min(GLYPH_COLLIDER_SPARKS, sparkCount);
+      if (nextWhip <= 0 && interactiveCount > 0) {
+        // One of the same eight interactive sparks is thrown across the frame;
+        // background indices never inherit glyph-collision work by chance.
         nextWhip = 2.4 + Math.random() * 4.5;
         whipLife = 0.7;
-        whipIndex = (Math.random() * sparkCount) | 0;
+        whipIndex = (Math.random() * interactiveCount) | 0;
         const edge = Math.random() * Math.PI * 2;
         sx[whipIndex] = width * 0.5 + Math.cos(edge) * width * 0.62;
         sy[whipIndex] = height * 0.5 + Math.sin(edge) * height * 0.62;
@@ -1280,7 +1252,8 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         sflash[whipIndex] = 1.4;
       }
 
-      // Inner debris laps the outer, same sense and same law as the disk.
+      // Inner debris laps the outer in the disk's clockwise screen direction:
+      // the near (bottom) arc travels from right to left.
       const orbitK = Math.sqrt(wellPull) * (0.55 + 0.55 * energy);
 
       for (let i = 0; i < sparkCount; i += 1) {
@@ -1289,6 +1262,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         const fromProjection = 1 + Math.max(0, sz[i]) * 1.9;
         const visibleFromX = wellX + (fromX - wellX) * fromProjection;
         const visibleFromY = wellY + (fromY - wellY) * fromProjection;
+        const interactive = i < GLYPH_COLLIDER_SPARKS;
         if (i === whipIndex && whipLife > 0) {
           sx[i] += svx[i] * dt;
           sy[i] += svy[i] * dt;
@@ -1297,7 +1271,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
           const visibleY = wellY + (sy[i] - wellY) * projection;
           deflectSpark(i, visibleFromX, visibleFromY, visibleX, visibleY, projection, dt, true);
         } else {
-          sa[i] += (orbitK / Math.pow(Math.max(sr[i], minSide * 0.12), 1.5)) * dt;
+          sa[i] -= (orbitK / Math.pow(Math.max(sr[i], minSide * 0.12), 1.5)) * dt;
           // A contour hit gets a short ballistic release before the orbit spring
           // gathers it again; otherwise the spring presses many sparks straight
           // back onto the same vertical stem and recreates an edge stack.
@@ -1312,7 +1286,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
           sflash[i] = Math.max(0, sflash[i] - dt * 2.2);
           orbitPlace(i);
 
-          if (pointerLife > 0) {
+          if (interactive && pointerLife > 0) {
             const px = sx[i] - pointerX;
             const py = sy[i] - pointerY;
             const pd2 = px * px + py * py;
@@ -1331,7 +1305,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
           const projection = 1 + Math.max(0, sz[i]) * 1.9;
           const visibleX = wellX + (sx[i] - wellX) * projection;
           const visibleY = wellY + (sy[i] - wellY) * projection;
-          deflectSpark(i, visibleFromX, visibleFromY, visibleX, visibleY, projection, dt, false);
+          if (interactive) deflectSpark(i, visibleFromX, visibleFromY, visibleX, visibleY, projection, dt, false);
         }
 
         const off = sx[i] < -margin || sx[i] > width + margin || sy[i] < -margin || sy[i] > height + margin;
@@ -1367,14 +1341,16 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         const projection = 1 + near * 1.9;
         let x = wellX + (sx[i] - wellX) * projection;
         let y = wellY + (sy[i] - wellY) * projection;
-        // Final visible-coordinate guard. Respawns and changing depth can move a
-        // projected point between simulation samples; resolve that exact uploaded
-        // center through the same contour response before WebGL ever sees it.
-        for (let attempt = 0; attempt < 2 && !isHeadlineClear(x, y); attempt += 1) {
-          const whipping = i === whipIndex && whipLife > 0;
-          if (!deflectHeadline(i, x, y, x, y, projection, 1 / 60, whipping, 8)) break;
-          x = wellX + (sx[i] - wellX) * projection;
-          y = wellY + (sy[i] - wellY) * projection;
+        // Only the fixed interactive subset receives the final glyph-contour
+        // correction. Background points keep their shared orbital phase even
+        // when their projection happens to pass through the headline.
+        if (i < GLYPH_COLLIDER_SPARKS) {
+          for (let attempt = 0; attempt < 2 && !isHeadlineClear(x, y); attempt += 1) {
+            const whipping = i === whipIndex && whipLife > 0;
+            if (!deflectHeadline(i, x, y, x, y, projection, 1 / 60, whipping, 8)) break;
+            x = wellX + (sx[i] - wellX) * projection;
+            y = wellY + (sy[i] - wellY) * projection;
+          }
         }
         const size = Math.min(30, dpr * (1.7 + depth * 0.9 + near * 9.5) * (1 + sflash[i] * 0.7));
         const gain = (0.5 + 0.7 * energy) * (0.42 + 0.58 * (depth * 0.5 + 0.5)) * (1 + sflash[i] * 1.6) * (1 - near * 0.3) * reveal;

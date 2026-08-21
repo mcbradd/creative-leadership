@@ -19,7 +19,7 @@ export const HERO_PARAMS: HeroParam[] = [
   { id: "timeScale", label: "Time scale", min: 0, max: 3, step: 0.05, format: (v) => `${v.toFixed(2)}×` },
   { id: "gravity", label: "Gravity", min: 0.2, max: 2.4, step: 0.05, format: (v) => `${v.toFixed(2)} M☉` },
   { id: "energy", label: "Particle energy", min: 0, max: 2.5, step: 0.05, format: (v) => `${(v * 3.14).toFixed(2)}e+28 W` },
-  { id: "waxFlow", label: "Wax flow", min: 0, max: 3, step: 0.05, format: (v) => `${(v * 2.91).toFixed(2)} %/s` },
+  { id: "waxFlow", label: "Orbital flow", min: 0, max: 3, step: 0.05, format: (v) => `${v.toFixed(2)}×` },
   { id: "tilt", label: "Disk tilt", min: 0, max: 1.6, step: 0.02, format: (v) => `${(v * 18).toFixed(1)}°` },
 ];
 

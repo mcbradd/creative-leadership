@@ -1,10 +1,3 @@
-/**
- * Runtime accessibility audit. `tests/site.test.mjs` is a source-text contract;
- * this one boots the real page and runs axe against the rendered DOM.
- *
- *   npm run test:a11y
- *   SITE_URL=https://... npm run test:a11y
- */
 import { AxeBuilder } from "@axe-core/playwright";
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
@@ -42,7 +35,7 @@ describe("accessibility", () => {
     ["desktop", { width: 1440, height: 900 }],
     ["mobile", { width: 390, height: 844 }],
   ]) {
-    test(`${name} has no WCAG A/AA violations at rest`, async () => {
+    test(`${name} overview has no WCAG A/AA violations`, async () => {
       const { page, context } = await openPage(browser, { url: url(), viewport, fx: "motion" });
       try {
         const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
@@ -53,57 +46,93 @@ describe("accessibility", () => {
     });
   }
 
-  test("static teaser hero has no WCAG A/AA violations", async () => {
+  test("keyboard focus remains visible while pointer entry has no automatic focus ring", async () => {
     const { page, context } = await openPage(browser, {
       url: url(),
-      viewport: { width: 1440, height: 900 },
+      viewport: { width: 390, height: 844 },
       fx: "motion",
     });
     try {
-      const hero = page.locator(".hero");
-      await hero.waitFor({ state: "visible" });
-      assert.equal(await hero.getAttribute("data-static"), "true", "hero should expose its static rendering mode");
-      assert.equal(await hero.getAttribute("data-scene"), null, "static hero must not expose obsolete scene state");
-      assert.equal(await hero.locator(".hero-scene-nav").count(), 0, "static hero must not expose obsolete scene controls");
+      assert.equal(await page.evaluate(() => document.activeElement === document.body), true, "entry should not auto-focus a slide or control");
+      await page.keyboard.press("Tab");
+      const keyboardFocus = await page.evaluate(() => {
+        const node = document.activeElement;
+        const style = getComputedStyle(node);
+        return {
+          tag: node?.tagName,
+          text: node?.textContent?.replace(/\s+/g, " ").trim(),
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
+          outlineColor: style.outlineColor,
+        };
+      });
+      assert.equal(keyboardFocus.tag, "BUTTON");
+      assert.notEqual(keyboardFocus.outlineStyle, "none", JSON.stringify(keyboardFocus));
+      assert.ok(Number.parseFloat(keyboardFocus.outlineWidth) >= 2, JSON.stringify(keyboardFocus));
 
-      const results = await new AxeBuilder({ page }).include(".hero").withTags(TAGS).analyze();
+      await page.mouse.click(200, 350);
+      const pointerRing = await page.evaluate(() => {
+        const node = document.activeElement;
+        return node?.matches(":focus-visible") ?? false;
+      });
+      assert.equal(pointerRing, false, "pointer entry should not display the keyboard focus treatment");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Explore exposes its state and a concise labelled navigation", async () => {
+    const { page, context } = await openPage(browser, {
+      url: url(),
+      viewport: { width: 390, height: 844 },
+      fx: "motion",
+    });
+    try {
+      const trigger = page.getByRole("button", { name: /EXPLORE/ });
+      assert.equal(await trigger.getAttribute("aria-expanded"), "false");
+      assert.equal(await trigger.getAttribute("aria-controls"), "explore-panel");
+      await trigger.click();
+      assert.equal(await trigger.getAttribute("aria-expanded"), "true");
+      const nav = page.getByRole("navigation", { name: "Explore the presentation" });
+      assert.equal(await nav.getByRole("button").count(), 6);
+
+      const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
       assert.equal(results.violations.length, 0, `\n${format(results.violations)}`);
     } finally {
       await context.close();
     }
   });
 
-  test("detail dialog traps focus and exposes a label", async () => {
+  test("detail article traps focus, exposes its title, and restores focus through browser history", async () => {
     const { page, context } = await openPage(browser, {
       url: url(),
-      viewport: { width: 1440, height: 900 },
+      viewport: { width: 390, height: 844 },
       fx: "motion",
     });
     try {
-      await page.evaluate(() => document.getElementById("work")?.scrollIntoView({ block: "start" }));
-      const opener = page.locator("#work button").first();
+      await page.locator("#work").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+      const opener = page.locator("#work .featured-case .article-link");
+      await opener.focus();
       await opener.click();
 
-      const dialog = page.locator("dialog[open]");
-      await dialog.waitFor({ state: "visible", timeout: 5000 });
-      assert.equal(await dialog.getAttribute("aria-modal"), "true");
-      assert.ok(await dialog.getAttribute("aria-labelledby"), "dialog needs aria-labelledby");
+      const surface = page.locator(".detail-surface[role='dialog']");
+      await surface.waitFor({ state: "visible" });
+      assert.equal(await surface.getAttribute("aria-modal"), "true");
+      assert.equal(await surface.getAttribute("aria-labelledby"), "detail-title");
+      assert.equal(await page.evaluate(() => document.querySelector(".detail-article")?.contains(document.activeElement)), true);
 
       const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
       assert.equal(results.violations.length, 0, `\n${format(results.violations)}`);
 
-      for (let index = 0; index < 5; index += 1) {
+      for (let index = 0; index < 7; index += 1) {
         await page.keyboard.press("Tab");
-        const focusIsInside = await page.evaluate(() => {
-          const openDialog = document.querySelector("dialog[open]");
-          return Boolean(openDialog?.contains(document.activeElement));
-        });
-        assert.equal(focusIsInside, true, `focus escaped the modal after ${index + 1} Tab presses`);
+        const inside = await page.evaluate(() => document.querySelector(".detail-article")?.contains(document.activeElement));
+        assert.equal(inside, true, `focus escaped the article after ${index + 1} Tab presses`);
       }
 
       await page.keyboard.press("Escape");
-      await dialog.waitFor({ state: "hidden", timeout: 5000 });
-      assert.equal(await opener.evaluate((node) => node === document.activeElement), true, "focus did not return to the originating case card");
+      await surface.waitFor({ state: "detached" });
+      assert.equal(await opener.evaluate((node) => node === document.activeElement), true, "focus did not return to the article opener");
     } finally {
       await context.close();
     }

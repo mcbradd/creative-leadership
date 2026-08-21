@@ -7,9 +7,12 @@ export const VIEWPORTS = {
   laptop: { width: 1280, height: 800 },
   tablet: { width: 834, height: 1112 },
   mobile: { width: 390, height: 844 },
+  phoneMax: { width: 440, height: 956 },
+  mobileShort: { width: 390, height: 650 },
 };
 
 export const SECTIONS = [
+  "capabilities",
   "team",
   "proof",
   "range",

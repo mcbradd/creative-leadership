@@ -5,170 +5,119 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const source = (file) => readFile(new URL(file, root), "utf8");
 
-test("publishes a private-by-convention executive artifact with an immediate proposition", async () => {
-  const [html, app, content] = await Promise.all([
-    source("index.html"),
-    source("src/App.tsx"),
-    source("src/content.ts"),
-  ]);
+test("publishes a private executive presentation with the approved proposition", async () => {
+  const [html, app] = await Promise.all([source("index.html"), source("src/App.tsx")]);
 
   assert.match(html, /noindex, nofollow, noarchive/);
-  assert.match(html, /Bradd \+ Stone — Creative Leadership/);
-  assert.match(app, /We turn IP into worlds people can/);
-  assert.match(app, /Not two résumés\.[\s\S]*One shipped result\./);
-  assert.match(content, /two successful seed rounds totaling more than \$7M/i);
-  assert.match(app, /<main id="main-content" tabIndex=\{-1\}>/);
+  assert.match(html, /Bradd \+ Stone: Creative Leadership/);
+  assert.match(app, /WE TURN IP INTO/);
+  assert.match(app, /PLAY, COLLECT, AND GROW\./);
+  assert.match(app, /NOT TWO RÉSUMÉS\.[\s\S]*ONE SHIPPED RESULT\./);
+  assert.doesNotMatch(`${html}\n${app}`, /Upper Deck|Carlin|Danny Trejo|Year of (the )?Devil/i);
 });
 
-test("does not expose private opportunity language", async () => {
-  const files = await Promise.all([
-    source("src/App.tsx"),
-    source("src/content.ts"),
-    source("index.html"),
-  ]);
-  const publicCopy = files.join("\n");
+test("defines exactly eleven full-viewport overview slides in one presentation root", async () => {
+  const [app, css] = await Promise.all([source("src/App.tsx"), source("src/styles.css")]);
+  const ids = [
+    "top",
+    "capabilities",
+    "team",
+    "proof",
+    "range",
+    "industry-proof",
+    "work",
+    "collaboration",
+    "depth",
+    "mentorship",
+    "contact",
+  ];
 
-  assert.doesNotMatch(publicCopy, /Upper Deck|Carlin|Danny Trejo|Year of (the )?Devil/i);
+  assert.equal((app.match(/<section\s+id=/g) ?? []).length, 11);
+  for (const id of ids) assert.match(app, new RegExp(`<section\\s+id="${id}"`));
+  assert.match(app, /<main[^>]*className="presentation"/s);
+  assert.match(css, /\.presentation \{[^}]*height: 100dvh;[^}]*overflow-x: hidden;[^}]*overflow-y: auto;/s);
+  assert.match(css, /\.presentation-slide \{[^}]*height: 100dvh;[^}]*min-height: 100dvh;[^}]*overflow: clip;/s);
+  assert.doesNotMatch(css, /\.presentation-slide[^\{]*\{[^}]*overflow-y:\s*(?:auto|scroll)/s);
 });
 
-test("uses a mobile-first responsive shell with safe dynamic overlays", async () => {
+test("uses static overview cards and compact selectors instead of horizontal subdecks", async () => {
+  const [app, css] = await Promise.all([source("src/App.tsx"), source("src/styles.css")]);
+
+  assert.match(app, /className="leader-grid"/);
+  assert.equal((app.match(/<LeaderCard leader=/g) ?? []).length, 2);
+  assert.match(app, /className="partner-selector"/);
+  assert.match(app, /partners\.map/);
+  assert.match(app, /className="case-selector"/);
+  assert.match(app, /caseStudies\.slice\(0, 6\)\.map/);
+  assert.match(app, /className="depth-board"/);
+  assert.doesNotMatch(`${app}\n${css}`, /leader-deck|leader-deck-cue|dual-timeline|timeline-track|scroll-snap-type:\s*x|overflow-x:\s*auto/);
+});
+
+test("keeps Connect, Explore, and the corrected first cue in the persistent header system", async () => {
+  const app = await source("src/App.tsx");
+
+  assert.match(app, />\s*CONNECT\s*<ArrowUpRight/);
+  assert.match(app, />\s*EXPLORE\s*/);
+  assert.match(app, /aria-expanded=\{exploreOpen\}/);
+  assert.match(app, /aria-controls="explore-panel"/);
+  assert.match(app, /\{ id: "top", label: "Superpowers combined" \}/);
+  const navBlock = app.split("const navItems = [")[1].split("] as const;")[0];
+  assert.equal((navBlock.match(/label: "/g) ?? []).length, 6);
+  for (const label of ["The partnership", "Proven together", "Play · Collect · Grow", "Selected case files", "Individual depth", "Start a conversation"]) {
+    assert.match(navBlock, new RegExp(`label: "${label.replace(/[·]/g, "\\·")}"`));
+  }
+  assert.doesNotMatch(app, /hamburger|menu-lines|Open presentation navigation/);
+});
+
+test("makes the detail article the only scrollable content surface and closes it through history", async () => {
+  const [app, css] = await Promise.all([source("src/App.tsx"), source("src/styles.css")]);
+
+  assert.match(app, /className="detail-surface"[\s\S]*role="dialog"[\s\S]*aria-modal="true"/);
+  assert.match(app, /className="detail-article"[\s\S]*tabIndex=\{-1\}/);
+  for (const label of ["Situation", "How it was led", "Evidence and results", "Why it matters", "Source context"]) {
+    assert.match(app, new RegExp(label));
+  }
+  assert.match(app, /window\.history\.pushState\(\{ braddStoneDetail: true \}, ""\)/);
+  assert.match(app, /window\.history\.back\(\)/);
+  assert.match(app, /addEventListener\("popstate"/);
+  assert.match(css, /\.detail-article \{[^}]*overflow-x: hidden;[^}]*overflow-y: auto;/s);
+  assert.doesNotMatch(css, /\.(?:leader-grid|leader-card|depth-board|depth-row|supporting-grid|partner-selector|case-selector)[^\{]*\{[^}]*overflow-[xy]:\s*(?:auto|scroll)/s);
+});
+
+test("prevents automatic hyphenation while retaining keyboard-only focus treatment", async () => {
   const css = await source("src/styles.css");
 
-  assert.match(css, /@media \(min-width: 700px\)/);
-  assert.match(css, /@media \(min-width: 1020px\)/);
-  assert.match(css, /@media \(max-width: 699px\) and \(max-height: 650px\)/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.match(css, /100dvh/);
-  assert.match(css, /env\(safe-area-inset-(?:top|right|bottom|left)\)/);
-  assert.match(css, /font-kerning: normal/);
-  assert.match(css, /Mona Sans Variable/);
-  assert.match(css, /Source Serif 4 Variable/);
-  assert.doesNotMatch(css, /Inter Variable|Newsreader Variable|Arial Narrow|Aptos Narrow/);
+  assert.match(css, /body \{[^}]*hyphens: none;[^}]*overflow-wrap: normal;[^}]*word-break: normal;/s);
+  assert.match(css, /:focus-visible \{[^}]*outline:\s*2px solid var\(--cyan\);[^}]*outline-offset:\s*3px;/s);
+  assert.doesNotMatch(css, /hyphens:\s*auto|word-break:\s*break-all/);
 });
 
-test("keeps the intro as a layered abstract teaser before partnership and proof", async () => {
-  const [app, css] = await Promise.all([
-    source("src/App.tsx"),
-    source("src/styles.css"),
-  ]);
-  const hero = app.split("function HeroSection")[1].split("export default function App")[0];
-
-  assert.match(hero, /className="hero"/);
-  assert.match(hero, /We turn IP into worlds people can/);
-  for (const layer of ["hero-grid", "hero-orbit", "hero-light-field"]) {
-    assert.match(hero, new RegExp(`className="${layer}" aria-hidden="true"`), `${layer} must remain decorative`);
-    assert.match(css, new RegExp(`\\.${layer}(?:\\W|$)`), `${layer} needs a visual treatment`);
-  }
-  const payoffTag = hero.match(/<em[^>]*>play, collect, and grow\.<\/em>/)?.[0] ?? "";
-  assert.match(payoffTag, /className="hero-payoff"/);
-  assert.match(payoffTag, /data-color-flow="payoff"/);
-  assert.match(css, /\.hero-payoff(?:\W|$)/);
-  assert.match(hero, /href="#team"/);
-  assert.doesNotMatch(hero, /<img|<button|LeaderCard|leaderInsights|jointInsights|Tetris|tetris-|heroChapters|hero-scene|hero-art|collage|data-scene|onOpenLeader|onOpenProof|B\+S/i);
-  assert.match(app, /<section className="team-section" id="team"/);
-  assert.match(app, /<section className="proof-section" id="proof"/);
-  assert.match(app, /Open the complete Tetris Beat joint case file/);
-  assert.doesNotMatch(app, /addEventListener\("wheel"|onWheel|WheelEvent/);
-});
-
-test("renders complete situation, contribution, evidence, and relevance without source-note UI", async () => {
-  const [app, content] = await Promise.all([
-    source("src/App.tsx"),
-    source("src/content.ts"),
-  ]);
-
-  for (const field of ["statement", "brief", "moves", "proof", "relevance"]) {
-    assert.match(content, new RegExp(`${field}\\??: `), `content schema must expose ${field}`);
-  }
-  assert.match(content, /owner: "Bradd" \| "Stone" \| "Joint"/);
-  assert.match(content, /relationship: string/);
-  assert.match(content, /export const jointInsights/);
-  assert.match(app, /aria-describedby="detail-summary"/);
-  assert.match(app, /01 \/ The situation/);
-  assert.match(app, /02 \/ Why it matters/);
-  assert.match(app, /detail\.relevance/);
-  assert.match(app, /detail\.moves\.map/);
-  assert.match(app, /detail\.proof\.map/);
-  assert.match(app, /04 \/ Evidence in context/);
-  assert.doesNotMatch(app, /detail\.sourceNote|Attribution note/);
-});
-
-test("uses real evidence imagery for every range lens and removes the abstract seed", async () => {
-  const [app, content, css] = await Promise.all([
-    source("src/App.tsx"),
-    source("src/content.ts"),
-    source("src/styles.css"),
-  ]);
-
-  assert.match(content, /export const rangeVisuals/);
-  assert.match(content, /play: \{ image: "ultimate-rivals-hires\.webp"/);
-  assert.match(content, /collect: \{ image: "stone-raid-hires\.webp"/);
-  assert.match(content, /grow: \{ image: "stone-chaotic-hires\.webp"/);
-  assert.match(app, /className="range-visual"/);
-  assert.match(app, /src=\{media\(rangeVisual\.image\)\}/);
-  assert.match(app, /alt=\{rangeVisual\.alt\}/);
-  assert.doesNotMatch(`${app}\n${css}`, /range-seed|data-mode=|WorldSeed/);
-});
-
-test("makes modal, navigation, toast, and visual-card affordances actionable", async () => {
-  const [app, css] = await Promise.all([
-    source("src/App.tsx"),
-    source("src/styles.css"),
-  ]);
-
-  assert.match(app, /function DetailDialog/);
-  assert.match(app, /function NavigationDialog/);
-  assert.match(app, /function Toast/);
-  assert.match(app, /dialog\.showModal\(\)/);
-  assert.match(app, /className="detail-dialog" aria-modal="true"/);
-  assert.match(app, /className="nav-dialog" aria-modal="true"/);
-  assert.match(app, /aria-expanded=\{navOpen\}/);
-  assert.match(app, /aria-label="Open presentation navigation"/);
-  assert.match(app, /role="status" aria-live="polite"/);
-  assert.match(app, /aria-label="Dismiss notification"/);
-  assert.match(app, /showNotice\("Email copied\.[^\n]+"success"\)/);
-  assert.match(app, /showNotice\(`Copy was unavailable\.[^\n]+"info"\)/);
-  assert.match(app, /data-fit-check/);
-  assert.match(app, /target="_blank" rel="noopener noreferrer"/);
-  assert.match(app, /className="proof-visual"[^>]*onClick/s);
-  assert.match(app, /className="collab-art"[^>]*onClick/s);
-  assert.match(app, /className=\{`supporting-card[^>]*onClick=\{\(\) => openInsight\(item\)\}/s);
-  assert.match(css, /\.detail-dialog, \.nav-dialog \{[^}]*100dvh/s);
-  assert.match(css, /\.toast \{[^}]*position: fixed/s);
-  assert.match(css, /\.toast button \{[^}]*min-width: 44px;[^}]*min-height: 44px/s);
-});
-
-test("keeps representation balanced in the featured case sequence", async () => {
-  const content = await source("src/content.ts");
-  const caseBlock = content.split("export const caseStudies")[1].split("export const partners")[0];
-  const owners = [...caseBlock.matchAll(/owner: "(Bradd|Stone)"/g)].map((match) => match[1]);
-  assert.deepEqual(owners.slice(0, 6), ["Bradd", "Stone", "Bradd", "Stone", "Bradd", "Stone"]);
-});
-
-test("attributes self-reported figures and drops unconfirmed ones", async () => {
-  const [app, content] = await Promise.all([
-    source("src/App.tsx"),
-    source("src/content.ts"),
-  ]);
+test("uses the current headshot and the corrected Tetris production record", async () => {
+  const [app, content] = await Promise.all([source("src/App.tsx"), source("src/content.ts")]);
   const copy = `${app}\n${content}`;
 
-  // C09: the public mask count is not confirmed for this exact Crayola scope.
+  assert.match(app, /bradd-headshot-2026\.webp/);
+  assert.match(copy, /42 live levels/i);
+  assert.match(copy, /12 levels in the original scope/i);
+  assert.match(copy, /14 levels at launch/i);
+  assert.match(copy, /28 more levels[\s\S]*42 total/i);
+  assert.doesNotMatch(app, />28<|28\s+LIVE LEVELS/i);
+  assert.match(copy, /20\+ artists/i);
+  assert.match(copy, /Bucharest[\s\S]*Guadalajara/i);
+});
+
+test("keeps representation balanced and claims visibly qualified", async () => {
+  const [app, content] = await Promise.all([source("src/App.tsx"), source("src/content.ts")]);
+  const caseBlock = content.split("export const caseStudies")[1].split("export const partners")[0];
+  const owners = [...caseBlock.matchAll(/owner: "(Bradd|Stone)"/g)].map((match) => match[1]);
+  const copy = `${app}\n${content}`;
+
+  assert.deepEqual(owners.slice(0, 6), ["Bradd", "Stone", "Bradd", "Stone", "Bradd", "Stone"]);
   assert.doesNotMatch(copy, /250\+|more than 250|over 250/i);
-  // C05: canonical team scaling is four to 55+, never the earlier five-to-80 draft.
   assert.doesNotMatch(copy, /5 to 80|5 → 80/);
-  assert.match(content, /4 → 55\+/);
-  // C02: the raise remains a team outcome, not sole credit.
-  assert.doesNotMatch(copy, /\$40M\+/);
-  assert.match(content, /team financing outcome reported at \$40M/i);
-  assert.match(content, /The raise was a team outcome/);
-  // C07: internal chart-performance language remains visibly qualified.
-  assert.match(app, /internal reporting says the game remained at or near the top of Apple Arcade for 6\+ weeks/);
-  // C08: name the faculty context without inventing a credential.
-  assert.doesNotMatch(copy, /MFA-level/);
-  assert.match(copy, /Game Design MFA faculty at LCAD/);
-  // C11: Stone's experience anchor remains attributed.
-  assert.match(content, /28 years/);
-  assert.match(content, /per his public résumé/);
-  // C15: portfolio relationships never become an unsupported production credit.
+  assert.match(copy, /4 → 55\+/);
+  assert.match(copy, /team financing outcome reported at \$40M/i);
+  assert.match(copy, /28 years/);
+  assert.match(copy, /per his public résumé/);
   assert.doesNotMatch(copy, /Batman: The Animated Series/);
 });
