@@ -701,3 +701,25 @@ h2 em.lava-flow { color: transparent; background-image: conic-gradient(from 108d
   .hero-copy { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
   .hero-instruments { align-self: center; margin: 0; }
 }
+
+@media (max-width: 699px) and (max-height: 760px) {
+  /* A phone with browser chrome showing has ~120px less than its nominal
+     height, and the instruments have to stay in the fold with it. */
+  .hero-shell { padding-top: calc(62px + env(safe-area-inset-top)); padding-bottom: 8px; }
+  .hero h1 { font-size: min(clamp(34px,11.5vw,60px),7.1vh); }
+  .hero .eyebrow { margin-bottom: 8px; }
+  .hero-footer > p { font-size: 12px; line-height: 1.4; }
+  .hero-enter { min-height: 44px; }
+  .hero-signals { display: none; }
+  .hero-instruments { margin-top: 6px; }
+  .hero-console { padding: 10px 10px 11px; gap: 5px 8px; }
+  .console-title { margin-bottom: 0; }
+}
+
+@media (max-width: 699px) and (max-height: 620px) {
+  /* Smallest phones with chrome: the well subtitle goes before any control does. */
+  .hero-shell { padding-top: calc(52px + env(safe-area-inset-top)); }
+  .hero h1 { font-size: min(clamp(30px,10.5vw,60px),6.5vh); }
+  .hero-footer > p { font-size: 11px; }
+  .console-title span { display: none; }
+}
