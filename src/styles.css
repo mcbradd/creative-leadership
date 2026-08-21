@@ -946,24 +946,28 @@ figure {
 
 .proof-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: auto minmax(200px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(5, auto);
+  align-content: center;
   gap: clamp(7px, 1.2dvh, 14px);
+  flex: 1;
   min-height: 0;
 }
 
 .proof-grid > .slide-heading,
 .proof-reel,
+.proof-metrics,
 .metric-story {
-  grid-column: 1 / -1;
+  grid-column: 1;
 }
 
 .proof-reel {
-  min-height: 200px;
+  min-height: 0;
 }
 
 .proof-metrics {
-  display: contents;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .proof-metrics button {
@@ -1977,27 +1981,6 @@ figure {
     height: min(68dvh, 680px);
   }
 
-  .proof-grid {
-    grid-template-columns: 0.82fr repeat(3, 0.39fr);
-    grid-template-rows: auto minmax(180px, 34dvh) auto auto;
-  }
-
-  .proof-grid > .slide-heading {
-    grid-column: 1 / -1;
-  }
-
-  .proof-reel {
-    grid-column: 1 / -1;
-  }
-
-  .metric-story {
-    grid-column: 1 / -1;
-  }
-
-  .proof-case-link {
-    grid-column: 1 / -1;
-  }
-
   .range-slide .slide-shell,
   .work-slide .slide-shell,
   .collaboration-slide .slide-shell,
@@ -2077,6 +2060,51 @@ figure {
   }
 }
 
+@media (min-width: 1024px) {
+  .proof-grid {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    grid-template-rows: repeat(4, auto);
+    grid-template-areas:
+      "heading reel"
+      "metrics reel"
+      "story reel"
+      "link reel";
+    column-gap: clamp(32px, 4.5vw, 76px);
+    row-gap: clamp(10px, 1.5dvh, 18px);
+  }
+
+  .proof-grid > .slide-heading {
+    grid-area: heading;
+    align-self: end;
+  }
+
+  .proof-reel {
+    grid-area: reel;
+    align-self: center;
+    width: 100%;
+  }
+
+  .proof-metrics {
+    grid-area: metrics;
+  }
+
+  .metric-story {
+    grid-area: story;
+    grid-template-columns: 0.6fr 1.4fr;
+    align-self: center;
+  }
+
+  .metric-story .article-link {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .proof-case-link {
+    grid-area: link;
+    align-self: start;
+  }
+}
+
 @media (max-height: 740px) {
   .slide-shell {
     gap: 8px;
@@ -2151,15 +2179,24 @@ figure {
     display: none;
   }
 
-  .proof-grid {
-    grid-template-rows: auto 80px auto auto;
-  }
-
   .collab-art {
     min-height: 80px;
   }
 
   .depth-row small {
+    display: none;
+  }
+}
+
+@media (max-width: 759px) {
+  .proof-slide .slide-shell {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
+@media (max-width: 759px) and (max-height: 740px) {
+  .proof-slide .slide-heading > p:not(.section-kicker, .warm-kicker) {
     display: none;
   }
 }
@@ -2176,6 +2213,11 @@ figure {
   .header-link,
   .wordmark {
     font-size: 0.66rem;
+  }
+
+  .proof-slide .slide-shell {
+    padding-right: 7px;
+    padding-left: 7px;
   }
 
   .presentation-cue {

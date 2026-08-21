@@ -148,6 +148,74 @@ describe("one-viewport presentation layout", () => {
     }
   });
 
+  test("Proven Together gives the 16:9 Tetris reel a large right-hand desktop stage and a contained mobile stage", async () => {
+    const proofViewports = [
+      ["short phone", { width: 390, height: 650 }],
+      ["phone", { width: 440, height: 956 }],
+      ["desktop", { width: 1440, height: 900 }],
+    ];
+
+    for (const [name, viewport] of proofViewports) {
+      const { page, context } = await openPage(browser, { url: site.url, viewport, fx: "motion" });
+      try {
+        const proof = page.locator("#proof");
+        await proof.evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+        const report = await proof.evaluate((slide) => {
+          const rect = (node) => {
+            const box = node.getBoundingClientRect();
+            return { top: box.top, right: box.right, bottom: box.bottom, left: box.left, width: box.width, height: box.height };
+          };
+          const heading = slide.querySelector(".slide-heading");
+          const metrics = slide.querySelector(".proof-metrics");
+          const grid = slide.querySelector(".proof-grid");
+          const reel = slide.querySelector(".proof-reel");
+          const stage = slide.querySelector(".tetris-reel__stage");
+          const header = document.querySelector(".topbar");
+          const cue = document.querySelector(".presentation-cue");
+          return {
+            heading: rect(heading),
+            metrics: rect(metrics),
+            stage: rect(stage),
+            header: rect(header),
+            cue: rect(cue),
+            grid: {
+              clientWidth: grid.clientWidth,
+              clientHeight: grid.clientHeight,
+              scrollHeight: grid.scrollHeight,
+            },
+            reel: {
+              clientWidth: reel.clientWidth,
+              scrollWidth: reel.scrollWidth,
+              clientHeight: reel.clientHeight,
+              scrollHeight: reel.scrollHeight,
+            },
+            stageOverflow: getComputedStyle(stage).overflow,
+            documentWidth: document.documentElement.scrollWidth,
+          };
+        });
+
+        const aspectRatio = report.stage.width / report.stage.height;
+        assert.ok(Math.abs(aspectRatio - (16 / 9)) <= 0.04, `${name}: stage ratio is ${aspectRatio}`);
+        assert.ok(report.stage.top >= report.header.bottom - EPSILON, `${name}: reel stage is behind the header`);
+        assert.ok(report.stage.bottom <= report.cue.top + EPSILON, `${name}: reel stage is behind the presentation cue`);
+        assert.ok(report.stage.left >= -EPSILON && report.stage.right <= viewport.width + EPSILON, `${name}: reel stage escapes horizontally`);
+        assert.equal(report.stageOverflow, "hidden", `${name}: stage does not clip its player/poster media`);
+        assert.ok(report.grid.scrollHeight <= report.grid.clientHeight + EPSILON, `${name}: proof grid overflows vertically ${JSON.stringify(report.grid)}`);
+        assert.ok(report.reel.scrollWidth <= report.reel.clientWidth + EPSILON, `${name}: reel creates horizontal overflow ${JSON.stringify(report.reel)}`);
+        assert.ok(report.reel.scrollHeight <= report.reel.clientHeight + EPSILON, `${name}: reel creates vertical overflow ${JSON.stringify(report.reel)}`);
+        assert.ok(report.documentWidth <= viewport.width + EPSILON, `${name}: reel creates document overflow`);
+
+        if (name === "desktop") {
+          assert.ok(report.stage.left >= report.heading.right + EPSILON, "desktop: reel must sit to the right of the slide heading");
+          assert.ok(report.stage.left >= report.metrics.right + EPSILON, "desktop: reel must sit to the right of the metrics");
+          assert.ok(report.stage.height >= 300, `desktop: reel stage is only ${report.stage.height}px tall`);
+        }
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
   test("desktop hero punctuation stays unclipped and slide titles keep the lighter-white, bolder-signal hierarchy", async () => {
     const { page, context } = await openPage(browser, {
       url: site.url,
