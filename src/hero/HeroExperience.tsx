@@ -106,17 +106,11 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   float density = edge * (0.40 + 0.90 * turb) * (0.52 + 0.76 * strands);
   density *= pow(1.0 - t, 0.80);
 
-  // A body caught in the well and being pulled apart: a dense head on a
-  // Keplerian orbit, with the shredded stream trailing behind it and fanning
-  // out in radius as the tidal stretch takes hold.
-  float rk = 7.4;
-  float ak = -uTime * 1.45 * pow(rk, -1.5) * 0.75;
-  float da = mod(atan(hit.z, hit.x) - ak + 3.14159265, 6.28318531) - 3.14159265;
-  float dr = r - rk;
-  float head = exp(-da * da / 0.022 - dr * dr / 0.42);
-  float tail = smoothstep(0.0, 0.10, da) * smoothstep(3.05, 1.70, da) * exp(-da * 1.15) * exp(-dr * dr / (0.55 + da * 0.85));
-  float debris = head + tail * 0.42 * (0.45 + 0.85 * strands);
-  density = clamp(density + debris * edge * 0.42, 0.0, 1.20);
+  // Plunging region: thin, hot gas between the inner edge and the horizon.
+  // Cutting emission dead at DISK_IN left a hard black wedge between the disk
+  // and the shadow wherever a ray threaded the gap.
+  float inner = smoothstep(RS * 1.30, DISK_IN, r) * (1.0 - smoothstep(DISK_IN, DISK_IN + 2.2, r));
+  density = max(density, inner * 0.30 * (0.45 + 0.75 * turb));
 
   // Relativistic beaming plus gravitational redshift.
   float speed = sqrt(RS / (2.0 * max(r, DISK_IN)));
@@ -132,33 +126,14 @@ vec3 sampleDisk(vec3 hit, vec3 marchDir, out float alpha) {
   col = mix(col, vec3(0.24, 0.94, 1.00), clamp((shift - 1.0) * 0.5, 0.0, 0.5));
   col *= beam;
 
-  // The head runs hotter than the gas around it and drags a cyan-lit trail.
-  col += vec3(1.00, 0.72, 0.94) * head * 1.45;
-  col += vec3(0.42, 0.90, 1.00) * tail * 0.42;
+  col += vec3(1.00, 0.60, 0.94) * inner * 0.55;
 
-  // The body itself is opaque, so it reads as a silhouette rather than a bright
-  // patch of gas. Its outline is an fbm-perturbed radius, and the only light on
-  // it comes from the disk and the hole it is falling into, which puts a hard
-  // terminator across it and an ablation rim on the leading edge.
-  vec2 bodyC = vec2(cos(ak), sin(ak)) * rk;
-  vec2 bd = hit.xz - bodyC;
-  float bdist = length(bd);
-  float bang = atan(bd.y, bd.x);
-  float bR = 0.22 * (1.0 + 0.34 * fbm(vec2(cos(bang), sin(bang)) * 2.6 + 11.0));
-  if (bdist < bR) {
-    float facing = dot(normalize(-bodyC), bdist > 1e-4 ? bd / bdist : vec2(0.0, 1.0));
-    float lit = smoothstep(0.30, -0.85, facing);
-    float relief = fbm(bd * 11.0 + 4.0);
-    float limb = smoothstep(bR, bR * 0.55, bdist);
-    vec3 rock = mix(vec3(0.020, 0.014, 0.052), vec3(0.30, 0.16, 0.44), lit * (0.55 + 0.75 * relief));
-    // Leading edge boiling off into the stream.
-    rock += vec3(1.00, 0.40, 0.78) * pow(lit, 2.2) * (0.30 + 0.60 * relief) * 0.85;
-    rock += vec3(0.55, 0.92, 1.00) * (1.0 - limb) * 0.22;
-    alpha = 1.0;
-    return rock;
-  }
-
-  alpha = clamp(density * 1.15, 0.0, 1.0);
+  // Opacity has to track emission. Gas near the horizon is redshifted almost
+  // dark, but it was still fully opaque, so a ray winding round the photon
+  // sphere crossed it several times and lost all its transmittance before it
+  // ever reached the bright disk behind — that is the black wedge that was cut
+  // into the accretion disk. Dim gas is now thin gas.
+  alpha = clamp(density * 1.15, 0.0, 1.0) * clamp(beam * 0.85, 0.03, 1.0);
   return col * (0.9 + 1.6 * density);
 }
 
@@ -190,7 +165,7 @@ vec3 trace(vec3 ro, vec3 rd) {
 
   vec3 nrm = cross(ro, rd);
   float nl = length(nrm);
-  if (nl < 1e-5) return vec3(0.0);
+  if (nl < 1e-5) return skyColor(rd);
   nrm /= nl;
 
   vec3 e1 = normalize(ro);
@@ -198,14 +173,13 @@ vec3 trace(vec3 ro, vec3 rd) {
 
   float r = length(ro);
   float tangential = dot(rd, e2);
-  if (abs(tangential) < 1e-5) return vec3(0.0);
+  if (abs(tangential) < 1e-5) return skyColor(rd);
 
   float u = 1.0 / r;
   float du = -dot(rd, e1) / (r * tangential);
   float phi = 0.0;
 
   vec3 pos = ro;
-  bool escaped = false;
   bool captured = false;
   vec3 exitDir = rd;
 
@@ -213,7 +187,11 @@ vec3 trace(vec3 ro, vec3 rd) {
     if (float(i) >= uSteps) break;
 
     // Short arcs deep in the well, long strides out in the flat region.
-    float dphi = clamp(0.13 / (u * 5.0 + 0.32), 0.012, 0.11);
+    // Near-critical rays wind around the photon sphere, so the floor has to be
+    // paid for out of the step budget: a fixed small floor means a low-tier
+    // device runs out of steps mid-orbit, which is what cut hard black slivers
+    // into the disk on phones.
+    float dphi = clamp(0.13 / (u * 7.0 + 0.32), max(0.008, 3.2 / uSteps), 0.11);
 
     // RK4 on the Binet orbit equation: u'' = -u + uGravity * RS * u^2,
     // where uGravity is 1.5 at true Schwarzschild strength.
@@ -236,7 +214,7 @@ vec3 trace(vec3 ro, vec3 rd) {
     du += (dphi / 6.0) * (b1 + 2.0 * b2 + 2.0 * b3 + b4);
     phi += dphi;
 
-    if (u <= 1e-4) { escaped = true; break; }
+    if (u <= 1e-4) break;
     r = 1.0 / u;
     if (r <= RS * 1.015) { captured = true; break; }
 
@@ -246,7 +224,7 @@ vec3 trace(vec3 ro, vec3 rd) {
       float k = pos.y / (pos.y - next.y);
       vec3 hit = mix(pos, next, k);
       float hr = length(hit.xz);
-      if (hr > DISK_IN && hr < DISK_OUT) {
+      if (hr > RS * 1.30 && hr < DISK_OUT) {
         float alpha;
         vec3 emit = sampleDisk(hit, normalize(next - pos), alpha);
         acc += emit * alpha * transmit * uEnergy;
@@ -257,14 +235,15 @@ vec3 trace(vec3 ro, vec3 rd) {
     exitDir = normalize(next - pos);
     pos = next;
 
-    if (r > 70.0 && du < 0.0) { escaped = true; break; }
+    if (r > 70.0 && du < 0.0) break;
     if (transmit < 0.01) break;
   }
 
-  // Only a ray that actually crossed the horizon comes back black. A ray that
-  // merely ran out of integration budget still has to return the sky, or the
-  // shadow grows a hard, faceted edge wherever the step count ran out.
-  if (!captured && transmit > 0.001) acc += transmit * skyColor(exitDir);
+  // Only a ray that crossed the horizon comes back with no sky behind it. A
+  // ray that merely ran out of integration budget is still winding around the
+  // photon sphere, so it keeps whatever it has already picked up.
+  if (captured) return acc;
+  acc += transmit * skyColor(exitDir);
   return acc;
 }
 
@@ -272,48 +251,72 @@ vec3 trace(vec3 ro, vec3 rd) {
 // A lamp photographed in a blacked-out room: the bulb underneath is the only
 // light in the scene. Wax fills the tube, so glass is the exception, not the
 // backdrop.
-const int LAVA_N = 12;
+const int LAVA_N = 26;
 
 float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-// Wax climbs and sinks on a straight vertical line. Nothing moves it sideways
-// except another blob: two passes of pairwise separation let neighbours roll
-// past one another, which is the only lateral motion in the tube.
-void buildBlobs(float t, out vec4 blobs[LAVA_N]) {
+// One convection cycle per blob: it pools and heats at the base, necks up into
+// a teardrop, floats, is drawn under the cool cap at the top, then sheds heat
+// and sinks back along its own lane. Nothing shoves it sideways, so the only
+// horizontal travel is the slow drift in and out of the gather at the top.
+void buildBlobs(float t, float halfW, out vec4 blobs[LAVA_N], out float stretch[LAVA_N]) {
   for (int i = 0; i < LAVA_N; i++) {
+    // Evenly spread lanes, jittered, two blobs per lane half a cycle apart.
+    // Hashed lanes clumped, and one blob per lane left most of the tube empty
+    // at any moment: both read as stray shapes rather than as a lamp full of
+    // wax.
     float fi = float(i);
-    float speed = 0.050 + 0.020 * fract(fi * 0.31);
-    float u = fract(t * speed + fract(fi * 0.618) + fi * 0.077);
-    // Heated at the base it climbs, stalls at the top while it sheds heat,
-    // then sinks back heavier and slower.
-    float rise = smoothstep(0.0, 0.42, u);
-    float fall = smoothstep(0.56, 1.0, u);
-    float x = (fract(fi * 0.293) * 2.0 - 1.0) * 2.35;
-    float y = -1.12 + 2.24 * rise - 2.24 * fall;
-    float z = (fract(fi * 0.771) * 2.0 - 1.0) * 0.34;
-    blobs[i] = vec4(x, y, z, 0.56 + 0.26 * fract(fi * 0.577));
-  }
+    float li = floor(fi * 0.5);
+    float lanes = float(LAVA_N) * 0.5;
+    float lane = ((li + 0.5) / lanes * 2.0 - 1.0) * (halfW - 0.35) + (fract(fi * 0.617) - 0.5) * 0.30;
+    float speed = 0.038 + 0.016 * fract(li * 0.31);
+    float u = fract(t * speed + 0.5 * mod(fi, 2.0) + fract(li * 0.618) + li * 0.077);
 
-  for (int relax = 0; relax < 2; relax++) {
-    for (int i = 0; i < LAVA_N; i++) {
-      float push = 0.0;
-      for (int j = 0; j < LAVA_N; j++) {
-        if (j == i) continue;
-        vec3 d = blobs[i].xyz - blobs[j].xyz;
-        float reach = (blobs[i].w + blobs[j].w) * 0.94;
-        float dist = length(d);
-        if (dist >= reach) continue;
-        // Biased by index so two blobs sharing a lane still pick opposite
-        // sides instead of shoving each other the same way forever.
-        float side = (d.x + (float(i) - float(j)) * 0.001) >= 0.0 ? 1.0 : -1.0;
-        push += side * (reach - dist) * 0.55;
-      }
-      blobs[i].x += clamp(push, -0.55, 0.55);
-    }
+    // Slow off the pool, quick through the middle, slow again under the cap.
+    float rise = smoothstep(0.14, 0.50, u);
+    float fall = smoothstep(0.70, 0.99, u);
+    float y = -1.18 + 2.32 * rise - 2.32 * fall;
+
+    // A short drift toward the middle while it is up top, released once it is
+    // back in the pool. Pulling all the way to the centre of a tube this wide
+    // was itself the sideways travel across the letters.
+    float gather = clamp(smoothstep(0.26, 0.52, u) - smoothstep(0.68, 0.94, u), 0.0, 1.0);
+    float x = lane - sign(lane) * min(abs(lane) * 0.25, 0.45) * gather;
+
+    // Elongated where it is being pulled: leaving the pool, and again as the
+    // cooled wax hangs and drips off the cap.
+    float neck = smoothstep(0.06, 0.18, u) * (1.0 - smoothstep(0.22, 0.44, u));
+    float drip = smoothstep(0.70, 0.78, u) * (1.0 - smoothstep(0.86, 0.98, u));
+    stretch[i] = 1.0 + 1.70 * neck + 0.85 * drip;
+
+    float z = (fract(fi * 0.771) * 2.0 - 1.0) * 0.30;
+    blobs[i] = vec4(x, y, z, 0.42 + 0.20 * fract(fi * 0.577));
   }
+}
+
+// An ellipsoid stretched along y. Dividing the axis only shrinks the gradient,
+// so this stays a safe underestimate for the march, and the radius is scaled
+// back to keep the blob's volume roughly constant as it elongates.
+float blobDist(vec3 p, vec4 b, float st) {
+  vec3 d = p - b.xyz;
+  d.y /= st;
+  return length(d) - b.w * pow(st, -0.33);
+}
+
+// The pool the wax melts out of and the cool cap it gathers under: both are
+// permanent, which is what makes the tube read as full rather than as loose
+// shapes floating in the dark.
+float lavaVessel(vec3 p) {
+  vec3 a = p - vec3(0.0, -1.72, 0.0);
+  a.x /= 30.0; a.z /= 1.70;
+  float pool = length(a) - 0.66;
+  vec3 b = p - vec3(0.0, 1.52, 0.0);
+  b.x /= 30.0; b.z /= 1.60;
+  float cap = length(b) - 0.42;
+  return min(pool, cap);
 }
 
 // Each blob keeps its own dye. Nearest-centre wins, so two colours meeting at a
@@ -331,55 +334,58 @@ vec3 blobColor(float i) {
   return c;
 }
 
-float lavaField(vec3 p, vec4 blobs[LAVA_N]) {
-  float d = 1e9;
+float lavaField(vec3 p, vec4 blobs[LAVA_N], float stretch[LAVA_N]) {
+  float d = lavaVessel(p);
   for (int i = 0; i < LAVA_N; i++) {
-    d = smin(d, length(p - blobs[i].xyz) - blobs[i].w, 0.30);
+    d = smin(d, blobDist(p, blobs[i], stretch[i]), 0.22);
   }
   return d;
 }
 
-vec3 lavaNearestColor(vec3 p, vec4 blobs[LAVA_N]) {
+vec3 lavaNearestColor(vec3 p, vec4 blobs[LAVA_N], float stretch[LAVA_N]) {
   float best = 1e9;
   vec3 col = vec3(1.0);
   for (int i = 0; i < LAVA_N; i++) {
-    float d = length(p - blobs[i].xyz) - blobs[i].w;
+    float d = blobDist(p, blobs[i], stretch[i]);
     if (d < best) { best = d; col = blobColor(float(i)); }
   }
   return col;
 }
 
-vec3 lavaNormal(vec3 p, vec4 blobs[LAVA_N]) {
+vec3 lavaNormal(vec3 p, vec4 blobs[LAVA_N], float stretch[LAVA_N]) {
   vec2 e = vec2(0.0018, 0.0);
   return normalize(vec3(
-    lavaField(p + e.xyy, blobs) - lavaField(p - e.xyy, blobs),
-    lavaField(p + e.yxy, blobs) - lavaField(p - e.yxy, blobs),
-    lavaField(p + e.yyx, blobs) - lavaField(p - e.yyx, blobs)
+    lavaField(p + e.xyy, blobs, stretch) - lavaField(p - e.xyy, blobs, stretch),
+    lavaField(p + e.yxy, blobs, stretch) - lavaField(p - e.yxy, blobs, stretch),
+    lavaField(p + e.yyx, blobs, stretch) - lavaField(p - e.yyx, blobs, stretch)
   ));
 }
 
-// Only visible where wax fails to cover: the curved tube wall picking up the
-// bulb and bending it into a bright vertical rim.
-vec3 glassWall(vec2 q, vec3 rd, float bulbFall) {
-  float curve = clamp(q.x / 2.9, -1.0, 1.0);
+// In a blacked-out room the tube itself is very nearly invisible: only the
+// wet rim right above the bulb catches anything at all.
+vec3 glassWall(vec2 q, float halfW, vec3 rd, float bulbFall) {
+  float curve = clamp(q.x / halfW, -1.0, 1.0);
   vec3 n = normalize(vec3(curve * 0.95, 0.14, 0.72));
   float fres = pow(1.0 - abs(dot(n, -rd)), 4.0);
-  vec3 col = vec3(0.008, 0.004, 0.018);
-  col += vec3(1.00, 0.24, 0.70) * bulbFall * 0.28;
-  col += vec3(0.30, 0.86, 1.00) * fres * 0.42;
-  float streak = pow(max(0.0, 1.0 - abs(curve * 2.4 - 0.55)), 9.0);
-  col += vec3(0.86, 0.72, 1.00) * streak * bulbFall * 0.58;
+  // Not pure black: a word that happens to sit over empty tube this frame
+  // still has to be readable, so the glass keeps a faint dye-lit floor.
+  vec3 col = vec3(0.26, 0.05, 0.34) * 0.42;
+  col += vec3(1.00, 0.24, 0.70) * bulbFall * bulbFall * 0.10;
+  col += vec3(0.30, 0.86, 1.00) * fres * bulbFall * 0.06;
   return col;
 }
 
 // Returns the wax surface, and separately the light it throws, so the caller
 // can spill that glow onto the page around the cut letters.
-vec3 lavaScene(vec2 q, float t, out vec3 glow) {
+vec3 lavaScene(vec2 q, float halfW, float t, out vec3 glow) {
   vec4 blobs[LAVA_N];
-  buildBlobs(t, blobs);
+  float stretch[LAVA_N];
+  buildBlobs(t, halfW, blobs, stretch);
 
-  vec3 ro = vec3(0.0, 0.0, 2.4);
-  vec3 rd = normalize(vec3(q, -1.9));
+  // All but orthographic. A pinhole this close to a tube this wide throws the
+  // outer blobs into heavy perspective; a lamp across a dark room does not.
+  vec3 ro = vec3(q, 2.4);
+  vec3 rd = normalize(vec3(q * 0.05, -1.0));
   float bulbY = -1.62;
   float bulbFall = 1.0 / (1.0 + (q.y - bulbY) * (q.y - bulbY) * 0.40);
 
@@ -389,9 +395,9 @@ vec3 lavaScene(vec2 q, float t, out vec3 glow) {
   float halo = 0.0;
   float best = 1e9;
   vec3 bestP = ro;
-  for (int i = 0; i < 64; i++) {
+  for (int i = 0; i < 56; i++) {
     p = ro + rd * dist;
-    float d = lavaField(p, blobs);
+    float d = lavaField(p, blobs, stretch);
     if (d < best) { best = d; bestP = p; }
     // Light leaking out of the wax: a near miss still carries glow, which is
     // what makes the tube read as lit rather than as flat shapes.
@@ -401,17 +407,17 @@ vec3 lavaScene(vec2 q, float t, out vec3 glow) {
     if (dist > 6.5) break;
   }
 
-  vec3 haloColor = lavaNearestColor(bestP, blobs);
+  vec3 haloColor = lavaNearestColor(bestP, blobs, stretch);
   glow = haloColor * clamp(halo, 0.0, 1.5);
-  if (!hit) return glassWall(q, rd, bulbFall) + glow * 0.55;
+  if (!hit) return glassWall(q, halfW, rd, bulbFall) + glow * 0.55;
 
-  vec3 n = lavaNormal(p, blobs);
+  vec3 n = lavaNormal(p, blobs, stretch);
   vec3 bulb = vec3(p.x, bulbY, 0.30);
   vec3 toLight = normalize(bulb - p);
 
   float thickness = 0.0;
   for (int i = 0; i < 7; i++) {
-    thickness += max(0.0, -lavaField(p + toLight * (0.05 + float(i) * 0.13), blobs));
+    thickness += max(0.0, -lavaField(p + toLight * (0.05 + float(i) * 0.13), blobs, stretch));
   }
   // 0.13 is the march step, so this is an optical depth rather than a raw sum.
   // Thin absorption on purpose: light has to carry far enough through the dye
@@ -424,17 +430,17 @@ vec3 lavaScene(vec2 q, float t, out vec3 glow) {
   float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.2);
   float spec = pow(max(dot(reflect(-toLight, n), -rd), 0.0), 22.0);
 
-  vec3 body = lavaNearestColor(p, blobs);
+  vec3 body = lavaNearestColor(p, blobs, stretch);
   // Hot wax at the base still carries the bulb; cooled wax up top is dimmer.
   float heat = mix(0.70, 1.55, smoothstep(1.05, -1.05, p.y));
 
   // What reaches the eye is bulb light that already scattered through the dye,
   // so transmission carries the colour and the surface terms only shape it.
-  vec3 col = body * transmit * falloff * (0.85 + 1.30 * wrap) * 3.20 * heat;
+  vec3 col = body * transmit * falloff * (0.85 + 1.30 * wrap) * 2.10 * heat;
   col += body * bulbFall * 0.85 * heat;
-  col += body * fres * 1.30;
-  col += body * 0.42;
-  col += vec3(0.92, 0.98, 1.00) * spec * 0.45;
+  col += body * fres * 0.85;
+  col += body * 0.30;
+  col += vec3(0.92, 0.98, 1.00) * spec * 0.30;
 
   // An emitting surface spills far more light than a near miss does.
   glow = body * (0.85 + 0.90 * fres) * heat + glow * 0.5;
@@ -565,27 +571,34 @@ void main() {
     vec2 mq = (gl_FragCoord.xy - uMaskRect.xy) / uMaskRect.zw;
     if (mq.x > 0.0 && mq.x < 1.0 && mq.y > 0.0 && mq.y < 1.0) {
       vec2 muv = vec2(mq.x, 1.0 - mq.y);
-      vec2 texel = 1.0 / uMaskRect.zw;
       float m = texture(uMask, muv).r;
 
-      // Dilate the mask into a halo so the wax can throw light past the letters.
-      float ring = 0.0;
-      for (int i = 0; i < 8; i++) {
-        float a = float(i) * 0.7853982;
-        vec2 dir = vec2(cos(a), -sin(a)) * texel;
-        ring = max(ring, texture(uMask, muv + dir * 3.0).r * 0.70);
-        ring = max(ring, texture(uMask, muv + dir * 8.0).r * 0.32);
-        ring = max(ring, texture(uMask, muv + dir * 15.0).r * 0.12);
-      }
-      float spill = max(ring - m, 0.0);
+      // Bloom read straight off the mip chain: each level is already a box
+      // blur of the one below, so three taps give a smooth falloff. Ring taps
+      // at these radii only ever produced eight displaced copies of the word.
+      // Fractional levels so the hardware interpolates between mips: whole
+      // high levels are box averages and their halo comes back rectangular.
+      float bloom = textureLod(uMask, muv, 1.2).r * 0.55
+                  + textureLod(uMask, muv, 2.6).r * 0.85
+                  + textureLod(uMask, muv, 4.1).r * 1.15;
+      bloom = clamp(bloom, 0.0, 1.0);
+      // Strictly outside the glyph: bloom over the letters only blows them out.
+      float spill = clamp(bloom - m, 0.0, 1.0);
 
       if (m > 0.002 || spill > 0.002) {
         vec2 q = (gl_FragCoord.xy - uLavaRect.xy) / uLavaRect.zw * 2.0 - 1.0;
-        q.x *= 2.7;
+        // Aspect-corrected: mapping a wide, short payoff box onto a square tube
+        // stretched every blob sideways, which is what read as wax sliding
+        // left and right across the letters instead of rising.
+        float halfW = max(1.0, uLavaRect.z / max(uLavaRect.w, 1.0));
+        q.x *= halfW;
         vec3 glow;
-        vec3 wax = lavaScene(q, uTime * uWax, glow);
+        vec3 wax = lavaScene(q, halfW, uTime * uWax, glow);
+        // The letters are the only light source on a black page, so they carry
+        // their own bloom outward and lift at their own edges.
+        vec3 halo = glow * uReveal * (spill * 1.25 + m * (1.0 - m) * 0.55);
         col = mix(col, tonemap(wax * uReveal), m);
-        col += glow * spill * 0.22 * uReveal;
+        col += halo;
       }
     }
   }
@@ -800,6 +813,12 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     const szv = new Float32Array(SPARK_MAX);
     const sflash = new Float32Array(SPARK_MAX);
     const shue = new Uint8Array(SPARK_MAX);
+    const sa = new Float32Array(SPARK_MAX);
+    const sr = new Float32Array(SPARK_MAX);
+    const sox = new Float32Array(SPARK_MAX);
+    const soy = new Float32Array(SPARK_MAX);
+    const sovx = new Float32Array(SPARK_MAX);
+    const sovy = new Float32Array(SPARK_MAX);
     let sparkCount = 0;
     let wellX = 0;
     let wellY = 0;
@@ -814,24 +833,32 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     let pointerY = 0;
     let pointerLife = 0;
 
+    // Debris rides a real orbit around the same well the shader draws: a
+    // Keplerian phase in the disk plane, squashed on screen by the view
+    // inclination, so the field reads as one system turning rather than as
+    // noise. Everything interactive sits on top as a perturbation that springs
+    // back, which keeps a shove readable without losing the orbit.
+    const orbitPlace = (i: number) => {
+      const flat = Math.max(0.10, Math.sin(Math.abs(viewIncl * heroParams.tilt)));
+      sx[i] = wellX + Math.cos(sa[i]) * sr[i] + sox[i];
+      sy[i] = wellY + Math.sin(sa[i]) * sr[i] * flat + soy[i];
+    };
+
     const spawnSpark = (i: number, fresh: boolean) => {
       const minSide = Math.min(canvas.width, canvas.height);
-      const angle = Math.random() * Math.PI * 2;
-      const radius = minSide * (fresh ? 0.14 + Math.random() * 0.62 : 0.5 + Math.random() * 0.35);
-      sx[i] = wellX + Math.cos(angle) * radius;
-      sy[i] = wellY + Math.sin(angle) * radius;
-      // Circular velocity for the softened well, so debris orbits instead of
-      // dropping straight in.
-      const speed = Math.sqrt(wellPull / Math.max(radius, minSide * 0.06)) * (0.82 + Math.random() * 0.3);
-      const spin = Math.random() < 0.86 ? 1 : -1;
-      svx[i] = -Math.sin(angle) * speed * spin;
-      svy[i] = Math.cos(angle) * speed * spin;
-      // A quarter of the field drifts toward the camera, which is what carries
-      // sparks out past the headline and off the front of the frame.
+      sa[i] = Math.random() * Math.PI * 2;
+      sr[i] = minSide * (fresh ? 0.24 + Math.random() * 0.80 : 0.62 + Math.random() * 0.45);
+      sox[i] = 0;
+      soy[i] = 0;
+      sovx[i] = 0;
+      sovy[i] = 0;
+      // A quarter of the field spirals toward the camera, which is what carries
+      // debris out past the headline and off the front of the frame.
       sz[i] = 0;
-      szv[i] = Math.random() < 0.26 ? 0.06 + Math.random() * 0.16 : 0;
+      szv[i] = Math.random() < 0.26 ? 0.05 + Math.random() * 0.14 : 0;
       sflash[i] = 0;
       shue[i] = (Math.random() * SPARK_COLORS.length) | 0;
+      orbitPlace(i);
     };
 
     const measureObstacles = () => {
@@ -875,7 +902,9 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     pointerHost?.addEventListener("pointermove", onPointer, { passive: true });
     pointerHost?.addEventListener("pointerdown", onPointer, { passive: true });
 
-    const bounceSpark = (i: number) => {
+    // The thrown spark is the one piece of debris off its orbit, so it carries a
+    // real velocity and reflects off the words it crosses.
+    const bounceWhip = (i: number) => {
       for (const box of obstacles) {
         if (sx[i] < box[0] || sx[i] > box[2] || sy[i] < box[1] || sy[i] > box[3]) continue;
         const toLeft = sx[i] - box[0];
@@ -883,11 +912,32 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         const toBottom = sy[i] - box[1];
         const toTop = box[3] - sy[i];
         const least = Math.min(toLeft, toRight, toBottom, toTop);
-        if (least === toLeft) { sx[i] = box[0] - 1; svx[i] = -Math.abs(svx[i]) * 0.74; }
-        else if (least === toRight) { sx[i] = box[2] + 1; svx[i] = Math.abs(svx[i]) * 0.74; }
-        else if (least === toBottom) { sy[i] = box[1] - 1; svy[i] = -Math.abs(svy[i]) * 0.74; }
-        else { sy[i] = box[3] + 1; svy[i] = Math.abs(svy[i]) * 0.74; }
+        if (least === toLeft) { sx[i] = box[0] - 1; svx[i] = -Math.abs(svx[i]) * 0.82; }
+        else if (least === toRight) { sx[i] = box[2] + 1; svx[i] = Math.abs(svx[i]) * 0.82; }
+        else if (least === toBottom) { sy[i] = box[1] - 1; svy[i] = -Math.abs(svy[i]) * 0.82; }
+        else { sy[i] = box[3] + 1; svy[i] = Math.abs(svy[i]) * 0.82; }
+        sflash[i] = 1.6;
+        return;
+      }
+    };
+
+    const bounceSpark = (i: number) => {
+      const kick = Math.min(canvas.width, canvas.height) * 0.09;
+      for (const box of obstacles) {
+        if (sx[i] < box[0] || sx[i] > box[2] || sy[i] < box[1] || sy[i] > box[3]) continue;
+        const toLeft = sx[i] - box[0];
+        const toRight = box[2] - sx[i];
+        const toBottom = sy[i] - box[1];
+        const toTop = box[3] - sy[i];
+        const least = Math.min(toLeft, toRight, toBottom, toTop);
+        // The bounce moves the perturbation, not the orbit, so the debris
+        // glances off the word and then swings back onto its track.
+        if (least === toLeft) { sox[i] -= toLeft + 1; sovx[i] = -kick; }
+        else if (least === toRight) { sox[i] += toRight + 1; sovx[i] = kick; }
+        else if (least === toBottom) { soy[i] -= toBottom + 1; sovy[i] = -kick; }
+        else { soy[i] += toTop + 1; sovy[i] = kick; }
         sflash[i] = 1;
+        orbitPlace(i);
         return;
       }
     };
@@ -896,8 +946,6 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       const width = canvas.width;
       const height = canvas.height;
       const minSide = Math.min(width, height);
-      const eaten = minSide * 0.05;
-      const soft = minSide * 0.06;
       const margin = minSide * 0.25;
       pointerLife = Math.max(0, pointerLife - dt);
 
@@ -921,39 +969,46 @@ export default function HeroExperience({ active, className, onFailure, onReady }
         sflash[whipIndex] = 1.4;
       }
 
-      for (let i = 0; i < sparkCount; i += 1) {
-        const dx = wellX - sx[i];
-        const dy = wellY - sy[i];
-        const r = Math.max(Math.sqrt(dx * dx + dy * dy), soft);
-        const pull = (wellPull / (r * r)) * dt;
-        svx[i] += (dx / r) * pull;
-        svy[i] += (dy / r) * pull;
+      // Inner debris laps the outer, same sense and same law as the disk.
+      const orbitK = Math.sqrt(wellPull) * (0.55 + 0.55 * energy);
 
-        if (pointerLife > 0) {
-          const px = sx[i] - pointerX;
-          const py = sy[i] - pointerY;
-          const pd2 = px * px + py * py;
-          const reach = minSide * 0.16;
-          if (pd2 < reach * reach && pd2 > 1) {
-            // Pointer wake: debris is shoved aside, which is the cheapest proof
-            // the field is live rather than a clip.
-            const pd = Math.sqrt(pd2);
-            const shove = (1 - pd / reach) * minSide * 2.6 * dt;
-            svx[i] += (px / pd) * shove;
-            svy[i] += (py / pd) * shove;
-            sflash[i] = Math.max(sflash[i], 0.6);
+      for (let i = 0; i < sparkCount; i += 1) {
+        if (i === whipIndex && whipLife > 0) {
+          sx[i] += svx[i] * dt;
+          sy[i] += svy[i] * dt;
+          bounceWhip(i);
+        } else {
+          sa[i] += (orbitK / Math.pow(Math.max(sr[i], minSide * 0.12), 1.5)) * dt;
+          // Spring, not free flight: a disturbed spark returns to its orbit.
+          sovx[i] += (-sox[i] * 16.0 - sovx[i] * 3.2) * dt;
+          sovy[i] += (-soy[i] * 16.0 - sovy[i] * 3.2) * dt;
+          sox[i] += sovx[i] * dt;
+          soy[i] += sovy[i] * dt;
+          sz[i] += szv[i] * dt;
+          sflash[i] = Math.max(0, sflash[i] - dt * 2.2);
+          orbitPlace(i);
+
+          if (pointerLife > 0) {
+            const px = sx[i] - pointerX;
+            const py = sy[i] - pointerY;
+            const pd2 = px * px + py * py;
+            const reach = minSide * 0.16;
+            if (pd2 < reach * reach && pd2 > 1) {
+              // Pointer wake: debris is shoved aside, which is the cheapest
+              // proof the field is live rather than a clip.
+              const pd = Math.sqrt(pd2);
+              const shove = (1 - pd / reach) * minSide * 2.6 * dt;
+              sovx[i] += (px / pd) * shove;
+              sovy[i] += (py / pd) * shove;
+              sflash[i] = Math.max(sflash[i], 0.6);
+            }
           }
+
+          bounceSpark(i);
         }
 
-        sx[i] += svx[i] * dt;
-        sy[i] += svy[i] * dt;
-        sz[i] += szv[i] * dt;
-        sflash[i] = Math.max(0, sflash[i] - dt * 2.2);
-
-        if (i !== whipIndex || whipLife <= 0) bounceSpark(i);
-
         const off = sx[i] < -margin || sx[i] > width + margin || sy[i] < -margin || sy[i] > height + margin;
-        if (off || sz[i] > 1 || (Math.abs(dx) < eaten && Math.abs(dy) < eaten)) {
+        if (off || sz[i] > 1) {
           if (i === whipIndex) whipLife = 0;
           spawnSpark(i, false);
         }
@@ -976,12 +1031,16 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       let slot = 0;
       for (let i = 0; i < sparkCount; i += 1) {
         const near = Math.max(0, sz[i]);
+        // +1 on the near arc of the orbit, -1 behind the hole: the same phase
+        // that squashes the ellipse also sizes and dims the spark, which is what
+        // makes the field read as a ring in depth instead of scattered points.
+        const depth = -Math.sin(sa[i]);
         // Approaching debris is pushed away from the well on screen as well as
         // scaled up, so it sweeps out past the headline toward the viewer.
         const x = wellX + (sx[i] - wellX) * (1 + near * 1.9);
         const y = wellY + (sy[i] - wellY) * (1 + near * 1.9);
-        const size = Math.min(30, dpr * (1.9 + near * 9.5) * (1 + sflash[i] * 0.7));
-        const gain = (0.5 + 0.7 * energy) * (1 + sflash[i] * 1.6) * (1 - near * 0.3) * reveal;
+        const size = Math.min(30, dpr * (1.7 + depth * 0.9 + near * 9.5) * (1 + sflash[i] * 0.7));
+        const gain = (0.5 + 0.7 * energy) * (0.42 + 0.58 * (depth * 0.5 + 0.5)) * (1 + sflash[i] * 1.6) * (1 - near * 0.3) * reveal;
         writeSpark(slot, x, y, size, SPARK_COLORS[shue[i]], gain);
         slot += 1;
       }
@@ -1025,7 +1084,10 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     const maskTexture = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, maskTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // The mask is rasterised several times larger than it is sampled, so it is
+    // minified on the way to the screen: without mipmaps LINEAR picks one texel
+    // in three and the glyph edges come back jagged.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -1034,7 +1096,9 @@ export default function HeroExperience({ active, className, onFailure, onReady }
     // so it can be rasterised well above framebuffer resolution: that oversample
     // is what keeps the glyph edges off the pixel grid instead of jagged.
     const MASK_SS = 3;
-    const MASK_MAX = 2048;
+    // Whatever the GPU actually allows, not a guessed 2048: on a DPR-3 phone the
+    // conservative cap left barely any oversample and the letters read soft.
+    const MASK_MAX = Math.min(8192, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
 
     const buildMask = () => {
       const target = canvas.parentElement?.querySelector<HTMLElement>(".hero-payoff");
@@ -1059,7 +1123,11 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       const bandW = box.width + pad * 2;
       const bandH = box.height + pad * 2;
 
-      const ss = Math.min(MASK_SS, MASK_MAX / Math.max(1, bandW * scaleX));
+      const ss = Math.min(
+        MASK_SS,
+        MASK_MAX / Math.max(1, bandW * scaleX),
+        MASK_MAX / Math.max(1, bandH * scaleY),
+      );
       const texW = Math.max(1, Math.round(bandW * scaleX * ss));
       const texH = Math.max(1, Math.round(bandH * scaleY * ss));
       maskCanvas.width = texW;
@@ -1093,6 +1161,7 @@ export default function HeroExperience({ active, className, onFailure, onReady }
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, maskTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+      gl.generateMipmap(gl.TEXTURE_2D);
 
       // gl_FragCoord counts from the bottom, the DOM box from the top.
       const glyphW = box.width * scaleX;
