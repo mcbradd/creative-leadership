@@ -120,6 +120,8 @@ describe("accessibility", () => {
       assert.equal(await surface.getAttribute("aria-modal"), "true");
       assert.equal(await surface.getAttribute("aria-labelledby"), "detail-title");
       assert.equal(await page.evaluate(() => document.querySelector(".detail-article")?.contains(document.activeElement)), true);
+      assert.equal(await surface.locator(".source-note").count(), 0);
+      assert.equal(await surface.getByText("Source context", { exact: true }).count(), 0);
 
       const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
       assert.equal(results.violations.length, 0, `\n${format(results.violations)}`);

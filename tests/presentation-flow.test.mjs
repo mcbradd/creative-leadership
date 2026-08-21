@@ -47,16 +47,22 @@ describe("presentation flow", () => {
         assert.equal(deckStyle.overflowX, "hidden");
         assert.equal(deckStyle.overflowY, "auto");
 
-        for (const [index, [id, label]] of SLIDES.entries()) {
+        for (const [id, label] of SLIDES) {
           const section = page.locator(`#${id}`);
           await section.evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
           await page.waitForFunction(
-            ({ id, number, label }) => {
+            ({ id, label }) => {
               const box = document.getElementById(id)?.getBoundingClientRect();
               const cue = document.querySelector(".presentation-cue")?.textContent ?? "";
-              return Math.abs(box?.top ?? 999) <= 2 && cue.includes(number) && cue.includes(label);
+              return Math.abs(box?.top ?? 999) <= 2 && cue.includes(label);
             },
-            { id, number: `${String(index + 1).padStart(2, "0")} / 11`, label },
+            { id, label },
+          );
+
+          assert.doesNotMatch(
+            (await page.locator(".presentation-cue").textContent()) ?? "",
+            /\b\d{1,2}\s*\/\s*11\b/,
+            `${name} #${id}: cue exposes a numeric counter`,
           );
 
           const report = await section.evaluate((node) => {
@@ -86,7 +92,7 @@ describe("presentation flow", () => {
     });
   }
 
-  test("cue advances one slide at a time without programmatically focusing slide content", async () => {
+  test("label-only cue advances one slide at a time without programmatically focusing slide content", async () => {
     const { page, context } = await openPage(browser, {
       url: site.url,
       viewport: { width: 390, height: 844 },
@@ -94,18 +100,19 @@ describe("presentation flow", () => {
     });
     try {
       const cue = page.locator(".presentation-cue");
-      assert.match((await cue.textContent()) ?? "", /01 \/ 11\s*Superpowers combined/);
+      assert.match((await cue.textContent()) ?? "", /Superpowers combined/);
+      assert.doesNotMatch((await cue.textContent()) ?? "", /\b\d{1,2}\s*\/\s*11\b/);
       assert.equal(await cue.getByRole("button", { name: "First slide" }).isDisabled(), true);
 
       const next = cue.getByRole("button", { name: "Next slide: Leadership lenses" });
       await next.click();
-      await page.waitForFunction(() => document.querySelector(".presentation-cue")?.textContent?.includes("02 / 11"));
+      await page.waitForFunction(() => document.querySelector(".presentation-cue")?.textContent?.includes("Leadership lenses"));
       assert.ok(Math.abs(await page.locator("#capabilities").evaluate((node) => node.getBoundingClientRect().top)) <= 2);
       assert.notEqual(await page.evaluate(() => document.activeElement?.id), "capabilities", "pointer navigation must not create an automatic blue focus ring on the slide");
 
       const previous = cue.getByRole("button", { name: "Previous slide: Superpowers combined" });
       await previous.click();
-      await page.waitForFunction(() => document.querySelector(".presentation-cue")?.textContent?.includes("01 / 11"));
+      await page.waitForFunction(() => document.querySelector(".presentation-cue")?.textContent?.includes("Superpowers combined"));
       assert.ok(Math.abs(await page.locator("#top").evaluate((node) => node.getBoundingClientRect().top)) <= 2);
     } finally {
       await context.close();

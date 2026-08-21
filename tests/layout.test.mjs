@@ -20,7 +20,7 @@ const SLIDES = [
   ["work", ".case-selector"],
   ["collaboration", ".collab-roles"],
   ["depth", ".depth-board"],
-  ["mentorship", ".leadership-path"],
+  ["mentorship", ".leadership-practices"],
   ["contact", ".contact-actions"],
 ];
 
@@ -145,6 +145,106 @@ describe("one-viewport presentation layout", () => {
       } finally {
         await context.close();
       }
+    }
+  });
+
+  test("desktop hero punctuation stays unclipped and slide titles keep the lighter-white, bolder-signal hierarchy", async () => {
+    const { page, context } = await openPage(browser, {
+      url: site.url,
+      viewport: { width: 1440, height: 900 },
+      fx: "motion",
+    });
+    try {
+      const heroTypography = await page.locator("#top").evaluate((hero) => {
+        const payoff = hero.querySelector(".hero-payoff");
+        const heroBox = hero.getBoundingClientRect();
+        const explicitLines = Array.from(payoff.querySelectorAll(".hero-payoff-line"));
+        const fragments = (explicitLines.length > 0
+          ? explicitLines.map((line) => line.getBoundingClientRect())
+          : Array.from(payoff.getClientRects()))
+          .filter((rect) => rect.width > 0 && rect.height > 0)
+          .map((rect) => ({ top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left }));
+        const lines = [];
+        for (const fragment of fragments.sort((a, b) => a.top - b.top || a.left - b.left)) {
+          const line = lines.find((candidate) => Math.abs(candidate.top - fragment.top) <= 1);
+          if (line) {
+            line.top = Math.min(line.top, fragment.top);
+            line.right = Math.max(line.right, fragment.right);
+            line.bottom = Math.max(line.bottom, fragment.bottom);
+            line.left = Math.min(line.left, fragment.left);
+          } else {
+            lines.push({ ...fragment });
+          }
+        }
+
+        const walker = document.createTreeWalker(payoff, NodeFilter.SHOW_TEXT);
+        let lastText = null;
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.textContent?.trim()) lastText = node;
+        }
+        const periodIndex = lastText?.textContent?.lastIndexOf(".") ?? -1;
+        const periodRange = document.createRange();
+        if (lastText && periodIndex >= 0) {
+          periodRange.setStart(lastText, periodIndex);
+          periodRange.setEnd(lastText, periodIndex + 1);
+        }
+        const period = periodIndex >= 0 ? periodRange.getBoundingClientRect() : null;
+        const clippingAncestors = [];
+        for (let node = payoff.parentElement; node && node !== document.body; node = node.parentElement) {
+          const style = getComputedStyle(node);
+          if ([style.overflow, style.overflowX, style.overflowY].some((value) => value === "hidden" || value === "clip")) {
+            const box = node.getBoundingClientRect();
+            clippingAncestors.push({ top: box.top, right: box.right, bottom: box.bottom, left: box.left });
+          }
+        }
+        return {
+          hero: { top: heroBox.top, right: heroBox.right, bottom: heroBox.bottom, left: heroBox.left },
+          lines,
+          period: period ? { top: period.top, right: period.right, bottom: period.bottom, left: period.left, width: period.width } : null,
+          clippingAncestors,
+        };
+      });
+
+      assert.ok(heroTypography.period && heroTypography.period.width > 0, JSON.stringify(heroTypography));
+      assert.ok(heroTypography.period.left >= heroTypography.hero.left - EPSILON, JSON.stringify(heroTypography));
+      assert.ok(heroTypography.period.right <= heroTypography.hero.right + EPSILON, JSON.stringify(heroTypography));
+      assert.ok(heroTypography.period.top >= heroTypography.hero.top - EPSILON, JSON.stringify(heroTypography));
+      assert.ok(heroTypography.period.bottom <= heroTypography.hero.bottom + EPSILON, JSON.stringify(heroTypography));
+      assert.ok(
+        heroTypography.clippingAncestors.every((box) => heroTypography.period.left >= box.left - EPSILON && heroTypography.period.right <= box.right + EPSILON && heroTypography.period.top >= box.top - EPSILON && heroTypography.period.bottom <= box.bottom + EPSILON),
+        JSON.stringify(heroTypography),
+      );
+      for (let index = 1; index < heroTypography.lines.length; index += 1) {
+        assert.ok(
+          heroTypography.lines[index].top >= heroTypography.lines[index - 1].bottom - EPSILON,
+          `hero payoff lines overlap: ${JSON.stringify(heroTypography.lines)}`,
+        );
+      }
+
+      const hierarchy = await page.locator(".hero-story h1, .slide-heading h2").evaluateAll((headings) => headings.map((heading) => {
+        const signal = heading.querySelector(".signal-flow");
+        const white = getComputedStyle(heading);
+        const accent = getComputedStyle(signal);
+        const trackingInEm = (style) => {
+          if (style.letterSpacing === "normal") return 0;
+          return Number.parseFloat(style.letterSpacing) / Number.parseFloat(style.fontSize);
+        };
+        return {
+          text: heading.textContent?.replace(/\s+/g, " ").trim(),
+          whiteWeight: Number.parseFloat(white.fontWeight),
+          signalWeight: Number.parseFloat(accent.fontWeight),
+          whiteTrackingEm: trackingInEm(white),
+          signalTrackingEm: trackingInEm(accent),
+        };
+      }));
+      assert.ok(hierarchy.length >= 10, JSON.stringify(hierarchy));
+      for (const title of hierarchy) {
+        assert.ok(title.whiteWeight < title.signalWeight, JSON.stringify(title));
+        assert.ok(title.whiteTrackingEm >= -0.041, JSON.stringify(title));
+        assert.ok(title.signalTrackingEm >= -0.041, JSON.stringify(title));
+      }
+    } finally {
+      await context.close();
     }
   });
 

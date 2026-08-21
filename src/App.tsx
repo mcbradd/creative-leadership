@@ -16,7 +16,7 @@ import {
   Copy,
   X,
 } from "@phosphor-icons/react";
-import { siApple, siRoblox, siToyota } from "simple-icons";
+import { siApple, siDcentertainment, siRoblox, siToyota } from "simple-icons";
 import {
   capabilityInsights,
   caseStudies,
@@ -31,6 +31,7 @@ import {
   type Insight,
 } from "./content";
 import { HERO_PARAMS, heroParams, setHeroParam, type HeroParamId } from "./hero/params";
+import TetrisReel from "./TetrisReel";
 
 const HeroExperience = lazy(() => import("./hero/HeroExperience"));
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -76,12 +77,11 @@ const proofMetrics: Insight[] = [
       "The wider team rebuilt priority work against one shared definition of done.",
     ],
     proof: [
-      "The user-verified internal production record describes a five-day recovery sprint.",
+      "The wider team completed a five-day recovery sprint.",
       "The rebuilt system carried the title through release eight months later.",
-      "Internal reporting says the game remained at or near the top of Apple Arcade for more than six weeks.",
+      "The game remained at or near the top of Apple Arcade for more than six weeks.",
     ],
     relevance: "The sprint matters because it changed the operating system, not just one deliverable.",
-    sourceNote: "Timing and performance details are user-verified internal production records.",
   },
   {
     id: "artists-aligned",
@@ -101,7 +101,6 @@ const proofMetrics: Insight[] = [
       "The shared system supported both launch content and later live operations.",
     ],
     relevance: "The evidence is not headcount alone. It is distributed judgment becoming consistent output.",
-    sourceNote: "Team composition and locations come from the user-verified internal production record.",
   },
   {
     id: "live-levels",
@@ -121,11 +120,58 @@ const proofMetrics: Insight[] = [
       "28 more levels across two funded 14-song seasons, for 42 total.",
     ],
     relevance: "The final count shows that the recovery created a system capable of sustained expansion.",
-    sourceNote: "Scope, launch, and live-operations counts are user-verified internal product records.",
   },
 ];
 
-const partnerCodes = ["APL", "TET", "DIS", "WB", "RBLX", "CRA", "TYT", "NIC", "SID", "UR", "SND", "BF"];
+const partnerLogoFiles: Record<string, string> = {
+  Tetris: "brand-logos/tetris.svg",
+  Disney: "brand-logos/disney.svg",
+  Crayola: "brand-logos/crayola.png",
+  "Nickelodeon / SpongeBob": "brand-logos/nickelodeon.svg",
+  Sideshow: "brand-logos/sideshow.svg",
+  "Ultimate Rivals": "brand-logos/ultimate-rivals.png",
+  "Sound Games": "brand-logos/sound-games.png",
+  "Bit Fry": "brand-logos/bit-fry.png",
+};
+
+const tetrisPortfolioMedia = [
+  {
+    image: "tetris-brand-mark-final.webp",
+    alt: "Rainbow Tetris Beat logo on a purple concert-light background",
+    label: "STONE · FINAL BRAND MARK",
+    href: "https://www.artstation.com/artwork/vbvKvD",
+  },
+  {
+    image: "tetris-brand-mark-process.webp",
+    alt: "Tetris Beat logo development sheet with six colorful wordmark iterations",
+    label: "STONE · BRAND SYSTEM DEVELOPMENT",
+    href: "https://www.artstation.com/artwork/vbvKvD",
+  },
+  {
+    image: "tetris-main-menu-vfx.webp",
+    alt: "Tetris Beat main menu with neon red, cyan, and violet reactive effects",
+    label: "BRADD · MAIN MENU VISUAL EFFECTS",
+    href: "https://www.artstation.com/artwork/JvqJ6A",
+  },
+  {
+    image: "tetris-summersalts.webp",
+    alt: "Tetris Beat Summersalts level with bright audio-reactive geometry",
+    label: "BRADD · SUMMERSALTS",
+    href: "https://www.artstation.com/artwork/NyLJAN",
+  },
+  {
+    image: "tetris-falling-fantasy.webp",
+    alt: "Tetris Beat Falling Fantasy level with layered neon reactive geometry",
+    label: "BRADD · FALLING FANTASY",
+    href: "https://www.artstation.com/artwork/qe5BrP",
+  },
+  {
+    image: "tetris-accidental-love.webp",
+    alt: "Tetris Beat Accidental Love level with vivid pink and blue music-reactive visuals",
+    label: "BRADD · ACCIDENTAL LOVE",
+    href: "https://www.artstation.com/artwork/JvqJLd",
+  },
+];
 
 function Signal({ children }: { children: ReactNode }) {
   return <em className="signal-flow">{children}</em>;
@@ -165,6 +211,7 @@ function trapFocus(event: globalThis.KeyboardEvent, root: HTMLElement) {
 
 function DetailArticle({ detail, onClose }: { detail: Detail; onClose: () => void }) {
   const articleRef = useRef<HTMLElement>(null);
+  const isTetrisDetail = detail.id === "tetris-beat-proof";
   const profileImage = detail.id === "bradd-profile"
     ? { file: "bradd-headshot-2026.webp", alt: "BRADD McBrearty" }
     : detail.id === "stone-profile"
@@ -208,7 +255,24 @@ function DetailArticle({ detail, onClose }: { detail: Detail; onClose: () => voi
             <X weight="bold" aria-hidden="true" />
           </button>
         </header>
-        {"image" in detail ? (
+        {isTetrisDetail ? (
+          <div className="tetris-detail-media">
+            <TetrisReel
+              active
+              posterSrc={media("tetris-brand-mark-final.webp")}
+              posterAlt="Rainbow Tetris Beat logo on a purple concert-light background"
+            />
+            <div className="tetris-art-grid" aria-label="Tetris Beat portfolio artwork">
+              {tetrisPortfolioMedia.map((item) => (
+                <a key={item.image} href={item.href} target="_blank" rel="noreferrer">
+                  <img src={media(item.image)} alt={item.alt} />
+                  <span>{item.label}</span>
+                  <ArrowUpRight weight="bold" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : "image" in detail ? (
           <figure className="detail-hero">
             <img
               src={media(detail.image)}
@@ -249,12 +313,6 @@ function DetailArticle({ detail, onClose }: { detail: Detail; onClose: () => voi
             <p className="detail-label">Why it matters</p>
             <p>{detail.relevance}</p>
           </section>
-          {detail.sourceNote ? (
-            <footer className="source-note">
-              <strong>Source context</strong>
-              <span>{detail.sourceNote}</span>
-            </footer>
-          ) : null}
         </div>
       </article>
     </aside>
@@ -341,7 +399,6 @@ function PresentationCue({
         <ArrowUp weight="regular" aria-hidden="true" />
       </button>
       <div className="cue-copy">
-        <span>{String(active + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
         <strong>{current.label}</strong>
       </div>
       <div className="cue-track" aria-hidden="true">
@@ -424,11 +481,16 @@ function HeroSlide({ active, exiting }: { active: boolean; exiting: boolean }) {
         <div className="hero-story">
           <Kicker>TWO DISCIPLINES. ONE LEADERSHIP SYSTEM.</Kicker>
           <h1>
-            WE TURN IP INTO
+            WE TURN IP INTO{" "}
             <br />
-            WORLDS PEOPLE CAN
+            WORLDS PEOPLE CAN{" "}
             <br />
-            <span className="hero-payoff"><Signal>PLAY, COLLECT, AND GROW.</Signal></span>
+            <span className="hero-payoff" aria-label="Play, collect, and grow.">
+              <Signal>
+                <span className="hero-payoff-line">PLAY, COLLECT, </span>
+                <span className="hero-payoff-line">AND GROW.</span>
+              </Signal>
+            </span>
           </h1>
           <p>
             Creative direction, art direction, game systems, and franchise thinking, built to move
@@ -485,24 +547,31 @@ function LeaderCard({
   onOpen: () => void;
 }) {
   const bradd = leader === "bradd";
+  const fullName = bradd ? "BRADD McBrearty" : "STONE Perales";
   return (
-    <article className={"leader-card leader-" + leader}>
+    <article className={"leader-card leader-" + leader} aria-labelledby={`${leader}-card-title`}>
       <img
         src={media(bradd ? "bradd-headshot-2026.webp" : "stone-portrait.webp")}
-        alt={bradd ? "BRADD McBrearty" : "STONE Perales"}
+        alt={fullName}
       />
       <div className="leader-card-copy">
         <p>{bradd ? "CREATIVE DIRECTOR" : "ART DIRECTOR"}</p>
-        <h3><b>{bradd ? "BRADD" : "STONE"}</b><span>{bradd ? "McBrearty" : "Perales"}</span></h3>
+        <h3 id={`${leader}-card-title`}><b>{bradd ? "BRADD" : "STONE"}</b><span>{bradd ? "McBrearty" : "Perales"}</span></h3>
         <small>
           {bradd
             ? "Game design · Product strategy · Technical direction"
             : "Worldbuilding · Visual systems · Franchise direction"}
         </small>
-        <button type="button" className="article-link" onClick={onOpen}>
+        <span className="article-link" aria-hidden="true">
           OPEN COMPLETE PROFILE <ArrowUpRight weight="bold" aria-hidden="true" />
-        </button>
+        </span>
       </div>
+      <button
+        type="button"
+        className="leader-card-trigger"
+        aria-label={`Open complete profile for ${fullName}`}
+        onClick={onOpen}
+      />
     </article>
   );
 }
@@ -517,15 +586,15 @@ function PartnershipSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
           <p>STONE makes the world coherent. BRADD makes it playable. Both lead the system.</p>
         </div>
         <div className="leader-grid">
-          <LeaderCard leader="bradd" onOpen={() => onOpen(openDetailValue(leaderInsights.bradd))} />
           <LeaderCard leader="stone" onOpen={() => onOpen(openDetailValue(leaderInsights.stone))} />
+          <LeaderCard leader="bradd" onOpen={() => onOpen(openDetailValue(leaderInsights.bradd))} />
         </div>
       </div>
     </section>
   );
 }
 
-function ProofSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
+function ProofSlide({ active, onOpen }: { active: boolean; onOpen: (detail: Detail) => void }) {
   const [activeMetric, setActiveMetric] = useState(0);
   const metric = proofMetrics[activeMetric];
   return (
@@ -537,13 +606,13 @@ function ProofSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
             <h2>NOT TWO RÉSUMÉS.<br /><Signal>ONE SHIPPED RESULT.</Signal></h2>
             <p>An at-risk production became one coherent creative and production system.</p>
           </div>
-          <figure className="proof-art">
-            <div className="proof-gameplay-window">
-              <img src={media("tetris-beat-gameplay.webp")} alt="Tetris Beat shipped gameplay" />
-            </div>
-            <img className="proof-cover" src={media("tetris-beat-cover.webp")} alt="Official Tetris Beat cover artwork" />
-            <figcaption>SHIPPED TOGETHER</figcaption>
-          </figure>
+          <TetrisReel
+            active={active}
+            compact
+            className="proof-reel"
+            posterSrc={media("tetris-brand-mark-final.webp")}
+            posterAlt="Rainbow Tetris Beat logo on a purple concert-light background"
+          />
           <div className="proof-metrics">
             {proofMetrics.map((item, index) => (
               <button
@@ -607,7 +676,8 @@ function RangeSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
             <h3>{insight.statement}</h3>
             <p>{insight.brief}</p>
             <button type="button" className="article-link sweep-link" onClick={() => onOpen(openDetailValue(insight))}>
-              HERE&apos;S HOW <ArrowUpRight weight="bold" aria-hidden="true" />
+              <span className="sweep-label" data-text="HERE'S HOW">HERE&apos;S HOW</span>
+              <ArrowUpRight weight="bold" aria-hidden="true" />
             </button>
           </div>
         </article>
@@ -616,8 +686,16 @@ function RangeSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
   );
 }
 
-function BrandMark({ index, name }: { index: number; name: string }) {
-  const icon = name === "Apple" ? siApple : name === "Roblox" ? siRoblox : name === "Toyota" ? siToyota : null;
+function BrandMark({ name }: { name: string }) {
+  const icon = name === "Apple"
+    ? siApple
+    : name === "Roblox"
+      ? siRoblox
+      : name === "Toyota"
+        ? siToyota
+        : name === "Warner Bros. / DC"
+          ? siDcentertainment
+          : null;
   if (icon) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -625,7 +703,8 @@ function BrandMark({ index, name }: { index: number; name: string }) {
       </svg>
     );
   }
-  return <span aria-hidden="true">{partnerCodes[index]}</span>;
+  const logo = partnerLogoFiles[name];
+  return logo ? <img src={media(logo)} alt="" aria-hidden="true" /> : null;
 }
 
 function IndustrySlide() {
@@ -653,7 +732,7 @@ function IndustrySlide() {
               aria-pressed={partnerIndex === index}
               onClick={() => setPartnerIndex(index)}
             >
-              <BrandMark index={index} name={item.name} />
+              <BrandMark name={item.name} />
             </button>
           ))}
         </div>
@@ -673,13 +752,11 @@ function IndustrySlide() {
           <h3>{partner.name}</h3>
           <strong>{partner.relationship}</strong>
           <p>{partner.note}</p>
-          <small>Contribution shown in context. No endorsement claim is implied.</small>
         </article>
         <div className="partner-controls">
           <button type="button" onClick={() => move(-1)}>
             <ArrowLeft weight="bold" aria-hidden="true" /> BACK
           </button>
-          <span>{String(partnerIndex + 1).padStart(2, "0")} / {partners.length}</span>
           <button type="button" onClick={() => move(1)}>
             NEXT <ArrowRight weight="bold" aria-hidden="true" />
           </button>
@@ -749,8 +826,8 @@ function CollaborationSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
           OPEN COMPLETE CASE <ArrowUpRight weight="bold" aria-hidden="true" />
         </button>
         <figure className="collab-art">
-          <img src={media("crayola-funny-faces-front.webp")} alt="Front of Crayola Funny Faces Crazy Costumes packaging" />
-          <img src={media("crayola-funny-faces-back.webp")} alt="Back of Crayola Funny Faces Crazy Costumes packaging" />
+          <img src={media("crayola-funny-faces-front-cutout.png")} alt="Front of Crayola Funny Faces Crazy Costumes packaging" />
+          <img src={media("crayola-funny-faces-back-cutout.png")} alt="Back of Crayola Funny Faces Crazy Costumes packaging" />
         </figure>
       </div>
     </section>
@@ -801,34 +878,37 @@ function MentorshipSlide({ onOpen }: { onOpen: (detail: Detail) => void }) {
     <section id="mentorship" className="presentation-slide mentorship-slide">
       <div className="slide-shell">
         <div className="slide-heading">
-          <Kicker>08 / LEADERSHIP AFTER THE LAUNCH</Kicker>
-          <h2>THE WORK SHIPS.<br /><Signal>THE TEAM GETS STRONGER.</Signal></h2>
-          <p>Senior leadership leaves behind better judgment, clearer standards, and people ready to carry the next decision.</p>
+          <Kicker>08 / EDUCATE · SPEAK · MENTOR</Kicker>
+          <h2>KNOWLEDGE SHARED.<br /><Signal>LEADERSHIP MULTIPLIED.</Signal></h2>
+          <p>They make hard-won creative judgment useful in classrooms, executive rooms, and the daily development of teams.</p>
         </div>
-        <div className="leadership-path" aria-label="Leadership compounds from judgment to teams to audiences">
-          <div><span>01</span><strong>JUDGMENT</strong><small>Make the standard visible.</small></div>
-          <ArrowRight weight="thin" aria-hidden="true" />
-          <div><span>02</span><strong>TEAMS</strong><small>Teach people to apply it.</small></div>
-          <ArrowRight weight="thin" aria-hidden="true" />
-          <div><span>03</span><strong>AUDIENCES</strong><small>Earn trust at every release.</small></div>
-        </div>
-        <div className="mentorship-proof">
+        <div className="leadership-practices">
           <article>
-            <Kicker>BRADD / SYSTEMS + LEADS</Kicker>
-            <strong>4 → 55+</strong>
-            <p>Scaled a studio while connecting product vision, production practice, and lead development.</p>
-            <button type="button" className="article-link" onClick={() => onOpen(openDetailValue(leaderInsights.bradd))}>
-              OPEN BRADD PROFILE <ArrowUpRight weight="bold" aria-hidden="true" />
-            </button>
+            <span>01</span>
+            <Kicker>EDUCATORS</Kicker>
+            <h3>TURN PRACTICE INTO A SYSTEM PEOPLE CAN USE.</h3>
+            <p>Bradd teaches in LCAD&apos;s Game Design MFA program. Together, they translate complex creative and production judgment into practical frameworks.</p>
           </article>
           <article>
-            <Kicker>STONE / VISUAL NETWORKS</Kicker>
-            <strong>40 → 200+</strong>
-            <p>Directed global contributor networks around one visual grammar and shared review standard.</p>
-            <button type="button" className="article-link" onClick={() => onOpen(openDetailValue(leaderInsights.stone))}>
-              OPEN STONE PROFILE <ArrowUpRight weight="bold" aria-hidden="true" />
-            </button>
+            <span>02</span>
+            <Kicker>PUBLIC SPEAKERS</Kicker>
+            <h3>MAKE THE ROOM SEE THE SAME DECISION.</h3>
+            <p>They clarify creative, product, and franchise complexity for pitches, working sessions, classrooms, and team reviews.</p>
           </article>
+          <article>
+            <span>03</span>
+            <Kicker>MENTORS</Kicker>
+            <h3>BUILD JUDGMENT, NOT DEPENDENCE.</h3>
+            <p>They train artists and leads to make stronger calls, give sharper critique, and carry the standard forward.</p>
+          </article>
+        </div>
+        <div className="mentorship-actions">
+          <button type="button" className="article-link" onClick={() => onOpen(openDetailValue(leaderInsights.bradd))}>
+            BRADD PROFILE <ArrowUpRight weight="bold" aria-hidden="true" />
+          </button>
+          <button type="button" className="article-link" onClick={() => onOpen(openDetailValue(leaderInsights.stone))}>
+            STONE PROFILE <ArrowUpRight weight="bold" aria-hidden="true" />
+          </button>
         </div>
       </div>
     </section>
@@ -1011,7 +1091,7 @@ export default function App() {
           <HeroSlide active={activeSlide === 0} exiting={heroTransitioning} />
           <CapabilitiesSlide onOpen={openDetail} />
           <PartnershipSlide onOpen={openDetail} />
-          <ProofSlide onOpen={openDetail} />
+          <ProofSlide active={activeSlide === 3 && !detail} onOpen={openDetail} />
           <RangeSlide onOpen={openDetail} />
           <IndustrySlide />
           <WorkSlide onOpen={openDetail} />
