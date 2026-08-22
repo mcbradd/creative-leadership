@@ -380,4 +380,51 @@ describe("one-viewport presentation layout", () => {
       }
     }
   });
+
+  test("Tetris detail keeps the portrait reel source-sized beside its desktop gallery", async () => {
+    const detailViewports = [
+      ["phone", { width: 390, height: 650 }],
+      ["desktop", { width: 1440, height: 900 }],
+    ];
+
+    for (const [name, viewport] of detailViewports) {
+      const { page, context } = await openPage(browser, { url: site.url, viewport, fx: "reduced" });
+      try {
+        await page.locator("#proof").evaluate((node) => node.scrollIntoView({ block: "start", behavior: "instant" }));
+        await page.locator("#proof .proof-case-link").click();
+        const surface = page.locator(".detail-surface");
+        await surface.waitFor({ state: "visible" });
+
+        const report = await surface.evaluate((node) => {
+          const rect = (selector) => {
+            const element = node.querySelector(selector);
+            if (!element) return null;
+            const box = element.getBoundingClientRect();
+            return { top: box.top, right: box.right, bottom: box.bottom, left: box.left, width: box.width, height: box.height };
+          };
+          return {
+            media: rect(".tetris-detail-media"),
+            reel: rect(".tetris-detail-media > .tetris-reel"),
+            stage: rect(".tetris-reel__stage"),
+            gallery: rect(".tetris-art-grid"),
+            documentWidth: document.documentElement.scrollWidth,
+          };
+        });
+
+        assert.ok(report.media && report.reel && report.stage && report.gallery, `${name}: incomplete Tetris detail geometry`);
+        assert.ok(report.reel.width <= 442 + EPSILON, `${name}: portrait reel upscales beyond its source-safe width (${report.reel.width}px)`);
+        assert.ok(Math.abs((report.stage.width / report.stage.height) - (221 / 480)) <= 0.005, `${name}: detail reel lost its native portrait ratio`);
+        assert.ok(report.documentWidth <= viewport.width + EPSILON, `${name}: Tetris detail creates horizontal document overflow`);
+
+        if (viewport.width >= 760) {
+          assert.ok(report.gallery.left >= report.reel.right - EPSILON, `${name}: gallery does not sit beside the reel`);
+          assert.ok(Math.abs(report.gallery.top - report.reel.top) <= EPSILON, `${name}: gallery and reel do not share a top edge`);
+        } else {
+          assert.ok(report.gallery.top >= report.reel.bottom - EPSILON, `${name}: gallery overlaps the mobile reel`);
+        }
+      } finally {
+        await context.close();
+      }
+    }
+  });
 });

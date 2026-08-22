@@ -1749,7 +1749,9 @@ figure {
 }
 
 .tetris-detail-media > .tetris-reel {
-  min-height: clamp(280px, 54dvh, 650px);
+  width: min(100%, 442px);
+  min-height: 0;
+  justify-self: center;
 }
 
 .tetris-art-grid {
@@ -1919,6 +1921,16 @@ figure {
   :root {
     --header-h: 72px;
     --cue-h: 74px;
+  }
+
+  .tetris-detail-media {
+    grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .tetris-detail-media > .tetris-reel {
+    width: 100%;
+    justify-self: start;
   }
 
   .presentation-cue {
