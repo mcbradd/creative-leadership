@@ -122,7 +122,7 @@ describe("one-viewport presentation layout", () => {
     }
   });
 
-  test("header and cue stay separate from slide essentials", async () => {
+  test("header and cue stay separate from all slide content", async () => {
     for (const [name, viewport] of VIEWPORTS) {
       const { page, context } = await openPage(browser, { url: site.url, viewport, fx: "motion" });
       try {
@@ -133,14 +133,26 @@ describe("one-viewport presentation layout", () => {
               const box = value.getBoundingClientRect();
               return { top: box.top, right: box.right, bottom: box.bottom, left: box.left };
             };
+            const slide = document.getElementById(id);
+            const shell = slide?.querySelector(":scope > .slide-shell");
             return {
               header: rect(document.querySelector(".topbar")),
               cue: rect(document.querySelector(".presentation-cue")),
               essential: rect(document.querySelector(`#${id} ${selector}`)),
+              content: shell
+                ? Array.from(shell.children).map((child) => ({
+                  label: child.className || child.tagName.toLowerCase(),
+                  box: rect(child),
+                }))
+                : [],
             };
           }, { id, selector });
           assert.equal(overlap(boxes.header, boxes.essential), 0, `${name} #${id}: header overlaps ${selector}`);
           assert.equal(overlap(boxes.cue, boxes.essential), 0, `${name} #${id}: cue overlaps ${selector}`);
+          for (const content of boxes.content) {
+            assert.equal(overlap(boxes.header, content.box), 0, `${name} #${id}: header overlaps ${content.label}`);
+            assert.equal(overlap(boxes.cue, content.box), 0, `${name} #${id}: cue overlaps ${content.label}`);
+          }
         }
       } finally {
         await context.close();

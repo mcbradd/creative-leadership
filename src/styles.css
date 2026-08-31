@@ -12,6 +12,11 @@
   --line-cyan: rgba(109, 231, 255, 0.34);
   --header-h: 58px;
   --cue-h: 66px;
+  /* The presentation has fixed navigation at both edges. Keep every slide's
+     content inside this shared safe frame rather than re-declaring the math
+     per section. */
+  --content-safe-top: calc(var(--header-h) + env(safe-area-inset-top) + clamp(12px, 2.2dvh, 28px));
+  --content-safe-bottom: calc(var(--cue-h) + env(safe-area-inset-bottom) + clamp(12px, 2.1dvh, 26px));
   --gutter: clamp(18px, 5vw, 72px);
   --display: "Mona Sans Variable", "Mona Sans", Arial, sans-serif;
   --text: "Mona Sans Variable", "Mona Sans", Arial, sans-serif;
@@ -165,9 +170,9 @@ figure {
   height: 100%;
   margin: 0 auto;
   padding:
-    calc(var(--header-h) + env(safe-area-inset-top) + clamp(12px, 2.2dvh, 28px))
+    var(--content-safe-top)
     var(--gutter)
-    calc(var(--cue-h) + env(safe-area-inset-bottom) + clamp(12px, 2.1dvh, 26px));
+    var(--content-safe-bottom);
 }
 
 .section-kicker,
@@ -2121,8 +2126,8 @@ figure {
 @media (max-height: 740px) {
   .slide-shell {
     gap: 8px;
-    padding-top: calc(var(--header-h) + env(safe-area-inset-top) + 9px);
-    padding-bottom: calc(var(--cue-h) + env(safe-area-inset-bottom) + 10px);
+    --content-safe-top: calc(var(--header-h) + env(safe-area-inset-top) + 9px);
+    --content-safe-bottom: calc(var(--cue-h) + env(safe-area-inset-bottom) + 10px);
   }
 
   .slide-heading {
@@ -2158,6 +2163,10 @@ figure {
 
   .article-link {
     min-height: 36px;
+  }
+
+  .supporting-grid {
+    min-height: 44px;
   }
 }
 
@@ -2199,6 +2208,7 @@ figure {
   .depth-row small {
     display: none;
   }
+
 }
 
 @media (max-width: 759px) {
