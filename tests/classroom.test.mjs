@@ -30,11 +30,12 @@ for (const [name, viewport] of [['desktop',{width:1440,height:900}],['mobile',{w
       const page = await context.newPage(); const errors=[]; page.on('pageerror', e=>errors.push(e.message));
       await page.goto(process.env.CLASSROOM_URL ?? `${site.url}/classroom/`);
       await page.waitForFunction(()=>document.querySelector('canvas')?.dataset.position);
+      await page.waitForFunction(()=>!document.querySelector('[aria-label="Rotate left"]').disabled);
       assert.equal(await page.getByRole('button',{name:'Walk inside',exact:true}).getAttribute('aria-pressed'),'true');
       await page.screenshot({path:`.impeccable/review/classroom/${name}.png`});
       const start=await pose(page);
       await page.getByRole('button',{name:'Step forward',exact:true}).click();
-      await page.waitForTimeout(150);
+      await page.waitForFunction(p=>{const q=document.querySelector('canvas').dataset.position.split(',').map(Number);return Math.hypot(p[0]-q[0],p[1]-q[1])>.25;},start);
       assert.ok(distance(start,await pose(page)) > .25, 'Step control actually walks');
       await page.getByRole('button',{name:'Return to entrance',exact:true}).click();
       const leftHeading=Number(await page.locator('canvas').getAttribute('data-heading'));
@@ -48,7 +49,9 @@ for (const [name, viewport] of [['desktop',{width:1440,height:900}],['mobile',{w
         await page.keyboard.up('w');
         assert.ok(distance(before,await pose(page))>.3, 'WASD moves camera');
         const heading=await page.locator('canvas').getAttribute('data-heading');
-        await page.keyboard.down('ArrowRight'); await page.waitForTimeout(250); await page.keyboard.up('ArrowRight');
+        await page.keyboard.down('ArrowRight');
+        await page.waitForFunction(h=>document.querySelector('canvas').dataset.heading!==h,heading);
+        await page.keyboard.up('ArrowRight');
         assert.notEqual(await page.locator('canvas').getAttribute('data-heading'),heading);
       } else {
         const cdp = await context.newCDPSession(page);
@@ -56,7 +59,7 @@ for (const [name, viewport] of [['desktop',{width:1440,height:900}],['mobile',{w
         const initial=await pose(page), heading=await page.locator('canvas').getAttribute('data-heading');
         await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:cx,y:cy,id:1},{x:265,y:365,id:2}]});
         await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:cx,y:cy-30,id:1},{x:315,y:380,id:2}]});
-        await page.waitForTimeout(400);
+        await page.waitForFunction(p=>{const q=document.querySelector('canvas').dataset.position.split(',').map(Number);return Math.hypot(p[0]-q[0],p[1]-q[1])>.2;},initial);
         await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
         assert.ok(distance(initial,await pose(page))>.2, 'Joystick moves while other finger looks');
         assert.notEqual(await page.locator('canvas').getAttribute('data-heading'),heading);
