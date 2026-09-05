@@ -64,3 +64,55 @@ button:focus-visible, a:focus-visible { outline: 3px solid #ad693d; outline-offs
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
 
+/* First-person experience: the room fills the viewport and controls sit at thumb height. */
+.immersive { min-height: 360px; background: #bedbdc; }
+.immersive .scene-shell { inset: 0; }
+.immersive .room-header { height: 90px; padding: env(safe-area-inset-top) 32px 0; color: #fff8e9; background: #253b32e8; }
+.immersive .room-caption { color: #e0e5d8; margin-left: -60px; }
+.immersive .brand-symbol { border-color: #e8eed170; }
+.immersive .help-button:hover { background: #ffffff20; }
+.immersive .light-control { top: 108px; right: 30px; }
+.immersive .control-caption { display: none; }
+.immersive .light-options { background: #fbf7ed; color: #303e36; }
+.walk-welcome { position: absolute; top: 115px; left: 32px; padding: 16px 20px; background: #fbf7edf2; border-radius: 12px; z-index: 2; pointer-events: none; }
+.walk-welcome h1 { font-size: 26px; font-weight: 450; letter-spacing: -.7px; line-height: 1.1; margin: 0; color: #303e36; }
+.walk-welcome h1 em { font-family: Georgia, serif; font-weight: 400; color: #52684b; }
+.walk-welcome p { margin: 10px 0 0; font-size: 11px; color: #53604d; }
+.immersive .scene-tools { top: auto; bottom: 186px; right: 35px; background: #fbf7ed; }
+.immersive .room-footer { bottom: calc(64px + env(safe-area-inset-bottom)); left: 30px; right: 30px; }
+.immersive .room-location { display: none; }
+.immersive .view-controls { margin: 0 auto; }
+.immersive .discovery-count { position: absolute; bottom: 78px; left: 50%; transform: translateX(-50%); background: #263a32; color: #f7f3e8; border-radius: 20px; padding: 8px 12px; justify-content: center; min-width: 0; white-space: nowrap; }
+.immersive .discover-shortcuts { background: #263a32; border-radius: 24px; padding: 4px 15px; bottom: calc(12px + env(safe-area-inset-bottom)); gap: 12px; }
+.immersive .discover-shortcuts button { color: #f5f1e2; min-height: 32px; }
+.immersive .discover-shortcuts button:hover, .immersive .discover-shortcuts button[aria-pressed=true] { color: #e0e9ab; }
+.walk-pad { position: absolute; left: 38px; bottom: calc(155px + env(safe-area-inset-bottom)); width: 150px; height: 150px; border-radius: 50%; background: #263a32e8; z-index: 3; touch-action: none; user-select: none; }
+.joystick { position: absolute; inset: 38px; background: #f7f3e82b; border: 1px solid #e9ecd04d; border-radius: 50%; padding: 0; touch-action: none; }
+.joystick-thumb { position: absolute; width: 44px; height: 44px; left: calc(50% - 22px); top: calc(50% - 22px); background: #f6f0da; border-radius: 50%; box-shadow: 0 3px 8px #0003; pointer-events: none; }
+.walk-step { display: grid; place-items: center; width: 44px; height: 36px; border: 0; border-radius: 18px; background: transparent; color: #f9f7e9; position: absolute; touch-action: manipulation; }
+.walk-step:hover { background: #ffffff25; }.step-up { top: 1px; left: 53px; }.step-down { bottom: 1px; left: 53px; }.step-left { left: 0; top: 57px; width: 36px; }.step-right { right: 0; top: 57px; width: 36px; }
+.walk-pad-label { position: absolute; left: 50%; top: calc(100% + 10px); transform: translateX(-50%); font-size: 10px; letter-spacing: 1.3px; color: #fffbed; background: #263a32; border-radius: 10px; padding: 4px 9px; }
+.look-cue { position: absolute; bottom: 190px; right: 112px; display: flex; flex-direction: column; gap: 9px; align-items: center; z-index: 2; color: #fffbed; background: #263a32e8; border-radius: 12px; padding: 15px; pointer-events: none; font-size: 10px; letter-spacing: 1px; }
+.look-cue small { font-size: 9px; letter-spacing: 0; }
+.crosshair { position: absolute; top: calc(50% - 3px); left: calc(50% - 3px); width: 6px; height: 6px; border-radius: 50%; background: #fffef0; outline: 1px solid #263a3290; pointer-events: none; z-index: 1; }
+.room-map { position: absolute; top: 176px; right: 32px; width: 120px; background: #263a32eb; padding: 11px; border-radius: 12px; color: #f5f0e3; z-index: 2; pointer-events: none; }
+.room-map svg { width: 100%; display: block; }.room-map span { display: block; text-align: center; font-size: 8px; letter-spacing: 1px; margin-top: 8px; }.map-walls { fill: none; stroke: #d9dfcba0; stroke-width: 1; }.map-board { stroke: #e5ce92; stroke-width: 3; }.map-desk { fill: #c5cbb57d; }.map-player { fill: #ffdd83; }
+.immersive .discovery-panel { top: 220px; left: 32px; max-height: calc(100% - 370px); overflow-y: auto; }
+.immersive .scene-error { z-index: 9; }.immersive .scene-loading { color: #273a32; background: #fcf7eb; padding: 20px; border-radius: 12px; }
+@media (max-width: 700px) {
+  .immersive .room-header { height: 72px; padding: env(safe-area-inset-top) 18px 0; }
+  .walk-welcome { top: 88px; left: 16px; padding: 12px 15px; }.walk-welcome h1 { font-size: 23px; }.walk-welcome p { display: none; }
+  .immersive .light-control { top: 86px; right: 17px; }.immersive .light-options { flex-direction: row; }.immersive .light-options button { width: 36px; height: 38px; }
+  .room-map { top: 148px; right: 18px; width: 86px; padding: 9px; }.room-map span { font-size: 7px; letter-spacing: .5px; }
+  .walk-pad { left: 19px; bottom: calc(163px + env(safe-area-inset-bottom)); width: 136px; height: 136px; }.joystick { inset: 34px; }.step-up, .step-down { left: 46px; }.step-left, .step-right { top: 50px; }
+  .look-cue { right: 20px; bottom: calc(241px + env(safe-area-inset-bottom)); font-size: 9px; padding: 12px; }.look-cue small { display: none; }
+  .immersive .scene-tools { bottom: calc(179px + env(safe-area-inset-bottom)); right: 23px; }.immersive .scene-tools .icon-button { height: 42px; width: 42px; }
+  .immersive .room-footer { left: 12px; right: 12px; bottom: calc(66px + env(safe-area-inset-bottom)); }.immersive .view-controls button { padding: 0 9px; font-size: 10px; }.immersive .discovery-count { bottom: 64px; font-size: 9px; padding: 6px 10px; }
+  .immersive .discover-shortcuts { gap: 8px; padding: 4px 12px; }.immersive .discover-shortcuts button { font-size: 9px; }
+  .immersive .discovery-panel { top: auto; bottom: calc(129px + env(safe-area-inset-bottom)); left: 16px; right: 16px; max-height: calc(100% - 220px); }
+}
+@media (max-height: 600px) and (min-width: 701px) {
+  .immersive .room-header { height: 58px; }.walk-welcome { display: none; }.immersive .light-control { top: 69px; right: 22px; }.room-map { display: none; }
+  .walk-pad { bottom: 95px; width: 136px; height: 136px; left: 20px; }.joystick { inset: 34px; }.step-up, .step-down { left: 46px; }.step-left, .step-right { top: 50px; }
+  .immersive .room-footer { bottom: 49px; }.immersive .discover-shortcuts { bottom: 5px; }.immersive .discovery-count { display: none; }.look-cue { bottom: 140px; right: 100px; }.look-cue small { display: none; }.immersive .scene-tools { bottom: 115px; right: 23px; }.immersive .discovery-panel { top: 70px; max-height: calc(100% - 170px); }
+}

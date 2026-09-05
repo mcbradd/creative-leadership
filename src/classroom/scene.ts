@@ -1,21 +1,25 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { createWalker } from "./walker";
+import type { Obstacle } from "./movement";
 
-export type View = "room" | "seat" | "board";
+export type View = "walk" | "room" | "seat" | "board";
 export type Lighting = "day" | "golden" | "night";
 export type Discovery = "globe" | "board" | "books" | "plant" | "bell";
 
-export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) => void, onReady: () => void) {
+export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) => void, onReady: () => void, onPose?: (pose: { x: number; z: number; yaw: number }) => void, onFailure?: () => void) {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.28;
   renderer.setClearColor(0x000000, 0);
-  renderer.domElement.setAttribute("aria-label", "Interactive 3D classroom. Drag to rotate, pinch or scroll to zoom. Use the view buttons for keyboard navigation.");
+  renderer.domElement.setAttribute("aria-label", "First-person classroom. Drag to look. Use the movement joystick or WASD to walk, and arrow keys to look around.");
   renderer.domElement.setAttribute("role", "img");
   host.appendChild(renderer.domElement);
   const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 120);
@@ -31,6 +35,8 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
   controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
   const world = new THREE.Group();
   scene.add(world);
+  const obstacles: Obstacle[] = [];
+  const obstacle = (x: number, z: number, w: number, d: number) => obstacles.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
   const textures: THREE.Texture[] = [];
   const materials: THREE.Material[] = [];
   const mat = (color: string | number, roughness = 0.75, metalness = 0) => {
@@ -95,6 +101,53 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
     for (const y of [1.13, 2.6, 3.8]) box(0.15, 0.07, 2.65, trim, -5.0, y, z);
     box(0.42, 0.1, 2.8, trim, -4.99, 1.06, z);
   }
+  // The complete interior is hidden only in the optional architectural overview.
+  const enclosure = new THREE.Group(); world.add(enclosure);
+  box(0.18, 4.5, 8.8, cream, 5.15, 2.2, 0, enclosure);
+  box(10.4, 4.5, 0.18, cream, 0, 2.2, 4.4, enclosure);
+  box(10.4, 0.16, 8.8, trim, 0, 4.49, 0, enclosure).castShadow = false;
+  box(0.08, 0.2, 8.8, dark, 5.02, 0.12, 0, enclosure);
+  box(10.4, 0.2, 0.08, dark, 0, 0.12, 4.27, enclosure);
+  for (const z of [-2.8, 0, 2.8]) box(10.2, 0.12, 0.15, edge, 0, 4.34, z, enclosure);
+  const fixture = mat("#fff1c8"); fixture.emissive.set("#ffe1a0"); fixture.emissiveIntensity = 0.8;
+  for (const z of [-2, 1.8]) {
+    box(2.1, 0.08, 0.58, dark, 0, 4.25, z, enclosure, true);
+    box(1.95, 0.035, 0.46, fixture, 0, 4.19, z, enclosure);
+  }
+  box(1.65, 2.95, 0.12, wood, 3.8, 1.47, 4.24, enclosure, true);
+  box(1.34, 1.05, 0.025, dark, 3.8, 2.19, 4.165, enclosure);
+  box(1.12, 0.85, 0.026, glass, 3.8, 2.19, 4.14, enclosure);
+  sphere(0.055, brass, 3.24, 1.21, 4.11, enclosure);
+  box(0.2, 0.04, 0.06, brass, 3.31, 1.21, 4.09, enclosure);
+  const poster = (title: string, subtitle: string, bg: string, orbit: boolean) => canvasTexture(512, 680, c => {
+    c.fillStyle = bg; c.fillRect(0, 0, 512, 680); c.fillStyle = "#f6edd6"; c.font = "bold 49px sans-serif"; c.textAlign = "center"; c.fillText(title, 256, 100);
+    c.strokeStyle = "#eadba8"; c.lineWidth = 4;
+    if (orbit) for (let i = 0; i < 4; i++) { c.beginPath(); c.ellipse(256, 330, 60 + i * 35, 60 + i * 35, 0, 0, Math.PI * 2); c.stroke(); }
+    else for (let i = 0; i < 7; i++) { c.beginPath(); c.moveTo(95 + i * 45, 465); c.lineTo(256, 210); c.lineTo(420 - i * 25, 465); c.stroke(); }
+    c.fillStyle = "#f6edd6"; c.font = "22px sans-serif"; c.fillText(subtitle, 256, 596);
+  });
+  for (const [i, title, subtitle, color] of [[0,"STAY CURIOUS","THERE IS ALWAYS MORE TO DISCOVER","#56715f"], [1,"MAKE THINGS","IMAGINATION IS A PRACTICE","#b07850"]] as const) {
+    box(1.53, 2.02, 0.08, wood, -2.8 + i * 2.7, 2.52, 4.23, enclosure);
+    const p = face(1.38, 1.86, poster(title, subtitle, color, i === 0), -2.8 + i * 2.7, 2.52, 4.18, enclosure); p.rotation.y = Math.PI;
+  }
+  // Right-wall pinboard and low storage make looking behind you a worthwhile discovery.
+  const pinboard = new THREE.Group(); pinboard.position.set(5.02, 2.5, -0.8); pinboard.rotation.y = -Math.PI / 2; enclosure.add(pinboard);
+  box(2.9, 1.85, 0.09, wood, 0, 0, 0, pinboard);
+  box(2.72, 1.67, 0.04, mat("#b5956a"), 0, 0, 0.07, pinboard);
+  for (let i = 0; i < 5; i++) {
+    const p = box(0.54, 0.7, 0.012, i % 2 ? paper : trim, -0.95 + (i % 3) * 0.9, i < 3 ? 0.35 : -0.47, 0.12, pinboard);
+    p.rotation.z = (i % 3 - 1) * 0.12;
+    sphere(0.024, brass, p.position.x, p.position.y + 0.28, 0.145, pinboard);
+  }
+  box(0.7, 1.0, 2.2, edge, 4.66, 0.5, -0.9, enclosure, true); obstacle(4.66, -0.9, 0.7, 2.2);
+  for (const z of [-1.6, -0.9, -0.2]) { box(0.035, 0.7, 0.63, wood, 4.29, 0.5, z, enclosure); sphere(0.035, brass, 4.25, 0.64, z, enclosure); }
+  const outdoors = new THREE.Group(); scene.add(outdoors);
+  box(35, 0.12, 40, mat("#839b6b"), -15, -0.45, 0, outdoors);
+  for (let i = 0; i < 12; i++) {
+    const x = -9 - i % 3 * 3.3, z = -15 + i * 2.7;
+    cylinder(0.16, 0.23, 4, wood, x, 1.6, z, outdoors);
+    const canopy = sphere(2.3, i % 2 ? green : mat("#9caa72"), x, 4.2, z, outdoors); canopy.scale.y = 1.25;
+  }
   const interactive: THREE.Object3D[] = [];
   const tag = (object: THREE.Object3D, id: Discovery) => { object.userData.discovery = id; interactive.push(object); };
   const boardGroup = new THREE.Group(); world.add(boardGroup);
@@ -147,6 +200,7 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
     box(0.08, 0.018, 0.008, paper, -0.76 + i * 0.178, 0.32 + row * 0.76, 0.185, shelf);
   }
   tag(shelf, "books");
+  obstacle(3.63, -3.93, 2.05, 0.71);
   // Teacher's desk and nine individual pupil desks, each with a modeled chair.
   function table(x: number, z: number, width: number, depth: number, height: number) {
     const group = new THREE.Group(); group.position.set(x, 0, z); world.add(group);
@@ -156,6 +210,7 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
     return group;
   }
   table(-1.2, -2.8, 2.75, 1.03, 1.22);
+  obstacle(-1.2, -2.8, 2.75, 1.03);
   box(1.3, 0.62, 0.07, wood, -1.2, 0.77, -2.36);
   book(-1.8, 1.33, -2.76, bookColors[0]); book(-1.83, 1.43, -2.78, bookColors[2]);
   cylinder(0.1, 0.1, 0.22, pot, -0.4, 1.39, -2.7);
@@ -164,6 +219,7 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
   cylinder(0.16, 0.18, 0.035, charcoal, 0, 0, 0, bell); sphere(0.135, brass, 0, 0.04, 0, bell); cylinder(0.025, 0.025, 0.07, brass, 0, 0.19, 0, bell); tag(bell, "bell");
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
     const x = -2.9 + col * 2.53, z = -0.8 + row * 1.62;
+    obstacle(x, z + 0.33, 1.55, 1.58);
     table(x, z, 1.55, 0.92, 1.1);
     const chair = new THREE.Group(); chair.position.set(x + 0.06, 0, z + 0.77); world.add(chair);
     box(0.78, 0.12, 0.7, green, 0, 0.61, 0, chair, true);
@@ -185,6 +241,7 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
     tag(g, "plant");
   }
   plant(-4.43, -3.68, 1.25); plant(4.46, 3.54, 1.3);
+  obstacle(-4.43, -3.68, 0.8, 0.8); obstacle(4.46, 3.54, 0.85, 0.85);
   // Globe with hand-authored continent silhouettes and geographic graticules.
   const globeMap = canvasTexture(1024, 512, c => {
     c.fillStyle = "#7fadb0"; c.fillRect(0, 0, 1024, 512); c.strokeStyle = "#cee0c455"; c.lineWidth = 1;
@@ -213,61 +270,101 @@ export function createClassroom(host: HTMLDivElement, onSelect: (id: Discovery) 
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.ShadowMaterial({ color: 0x6f614a, opacity: 0.16 }));
   materials.push(shadow.material); shadow.rotation.x = -Math.PI / 2; shadow.position.y = -0.39; shadow.receiveShadow = true; scene.add(shadow);
 
-  let currentView: View = "room", destination: { camera: THREE.Vector3; target: THREE.Vector3 } | null = null;
-  function view(which: View, instant = false) {
-    currentView = which;
-    controls.minDistance = which === "room" ? 7 : 0.8;
-    const narrow = host.clientWidth < 700;
-    const p = which === "seat" ? new THREE.Vector3(0, 1.9, 2.3) : which === "board" ? new THREE.Vector3(-0.85, 2.65, 2.1) : new THREE.Vector3(narrow ? 18 : 13.4, narrow ? 15.5 : 11.6, narrow ? 23.2 : 17.2);
-    const target = which === "room" ? new THREE.Vector3(0, 1.2, 0) : new THREE.Vector3(-0.85, 2.35, -4.0);
-    if (instant) { camera.position.copy(p); controls.target.copy(target); controls.update(); destination = null; }
-    else destination = { camera: p, target };
-  }
-  const cancelTransition = () => { destination = null; };
-  controls.addEventListener("start", cancelTransition);
-  function resize() { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); view(currentView, true); }
-  const observer = new ResizeObserver(resize); observer.observe(host); resize();
+  let currentView: View = "walk", lightMode: Lighting = "day", paused = false;
   const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
-  let down = { x: 0, y: 0 }, activePointers = 0, wasMulti = false;
-  const pointerDown = (e: PointerEvent) => { activePointers++; if (activePointers > 1) wasMulti = true; else wasMulti = false; down = { x: e.clientX, y: e.clientY }; };
+  function pick(x: number, y: number) {
+    if (paused) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.set((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1);
+    raycaster.setFromCamera(pointer, camera);
+    // Raycast all visible room geometry so discoveries cannot be clicked through walls or furniture.
+    const hits = raycaster.intersectObject(world, true).filter(hit => {
+      let item: THREE.Object3D | null = hit.object;
+      while (item) { if (!item.visible) return false; item = item.parent; }
+      return !(hit.object instanceof THREE.Points);
+    });
+    if (hits[0]) {
+      let item: THREE.Object3D | null = hits[0].object;
+      while (item && !item.userData.discovery) item = item.parent;
+      if (item) onSelect(item.userData.discovery);
+    }
+  }
+  const walker = createWalker(camera, renderer.domElement, obstacles, pick);
+  function background() {
+    scene.background = currentView === "room" ? null : new THREE.Color(lightMode === "night" ? "#172738" : lightMode === "golden" ? "#eed2a5" : "#bedbdc");
+  }
+  function view(which: View) {
+    currentView = which;
+    controls.enabled = which === "room" && !paused;
+    walker.setEnabled(which !== "room");
+    enclosure.visible = outdoors.visible = which !== "room";
+    camera.fov = which === "room" ? 36 : host.clientWidth < 700 ? 78 : 68;
+    camera.updateProjectionMatrix();
+    if (which === "room") {
+      const narrow = host.clientWidth < 700;
+      camera.position.set(narrow ? 18 : 13.4, narrow ? 15.5 : 11.6, narrow ? 23.2 : 17.2);
+      controls.minDistance = 7; controls.target.set(0, 1.2, 0); controls.update();
+    } else if (which === "seat") walker.teleport(-0.4, -1.73, 0, 0.06);
+    else if (which === "board") walker.teleport(3.4, -2.35, 0.16, 0.2);
+    else walker.teleport(1.0, 3.65, 0.14, -0.025);
+    background();
+    renderer.shadowMap.needsUpdate = true;
+  }
+  function resize() {
+    const w = host.clientWidth, h = host.clientHeight;
+    renderer.setSize(w, h); camera.aspect = w / h;
+    camera.fov = currentView === "room" ? 36 : w < 700 ? 78 : 68;
+    camera.updateProjectionMatrix();
+  }
+  const observer = new ResizeObserver(resize); observer.observe(host); resize(); view("walk");
+  let down = { x: 0, y: 0 }, orbitPointers = 0, wasMulti = false;
+  const pointerDown = (e: PointerEvent) => { if (currentView !== "room") return; orbitPointers++; wasMulti = orbitPointers > 1; down = { x: e.clientX, y: e.clientY }; };
   const pointerUp = (e: PointerEvent) => {
-    activePointers = Math.max(0, activePointers - 1);
-    if (wasMulti || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 7) return;
-    const rect = renderer.domElement.getBoundingClientRect(); pointer.set((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
-    raycaster.setFromCamera(pointer, camera); const hits = raycaster.intersectObjects(interactive, true);
-    if (hits[0]) { let obj: THREE.Object3D | null = hits[0].object; while (obj && !obj.userData.discovery) obj = obj.parent; if (obj) onSelect(obj.userData.discovery); }
+    if (currentView !== "room") return;
+    orbitPointers = Math.max(0, orbitPointers - 1);
+    if (!wasMulti && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 7) pick(e.clientX, e.clientY);
   };
-  const pointerCancel = () => { activePointers = 0; wasMulti = true; };
+  const pointerCancel = () => { orbitPointers = 0; wasMulti = true; };
   renderer.domElement.addEventListener("pointerdown", pointerDown); renderer.domElement.addEventListener("pointerup", pointerUp); renderer.domElement.addEventListener("pointercancel", pointerCancel);
+  const contextLost = (e: Event) => { e.preventDefault(); onFailure?.(); walker.pause(true); };
+  renderer.domElement.addEventListener("webglcontextlost", contextLost);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let spinning = false, visible = true, firstFrame = true, last = performance.now();
+  let spinning = false, visible = true, firstFrame = true, last = performance.now(), poseTime = 0;
   const visibility = () => { visible = !document.hidden; last = performance.now(); };
   document.addEventListener("visibilitychange", visibility);
   renderer.setAnimationLoop((now) => {
     const dt = Math.min((now - last) / 1000, 0.05); last = now; if (!visible) return;
-    if (destination) {
-      const ease = reducedMotion ? 1 : 1 - Math.exp(-dt * 5);
-      camera.position.lerp(destination.camera, ease); controls.target.lerp(destination.target, ease);
-      if (camera.position.distanceTo(destination.camera) < 0.015) destination = null;
-    }
+    if (currentView === "room") { if (!paused) controls.update(); } else walker.update(dt);
     if (spinning && !reducedMotion) globe.rotation.y += dt * 0.55;
     if (!reducedMotion) dust.rotation.y += dt * 0.007;
-    controls.update(); renderer.render(scene, camera);
+    if (now - poseTime > 80) { onPose?.(walker.pose()); poseTime = now; }
+    renderer.render(scene, camera);
     if (firstFrame) { firstFrame = false; onReady(); }
   });
   return {
     view, lesson,
-    rotate: (amount: number) => { const offset = camera.position.clone().sub(controls.target); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), amount); camera.position.copy(controls.target).add(offset); controls.update(); },
-    zoom: (factor: number) => { const offset = camera.position.clone().sub(controls.target); offset.multiplyScalar(factor).clampLength(controls.minDistance, controls.maxDistance); camera.position.copy(controls.target).add(offset); controls.update(); },
+    input: walker.input,
+    step: walker.step,
+    pause: (value: boolean) => { paused = value; walker.pause(value); controls.enabled = currentView === "room" && !value; },
+    rotate: (amount: number) => {
+      if (currentView !== "room") { walker.turn(amount); return; }
+      const offset = camera.position.clone().sub(controls.target); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), amount); camera.position.copy(controls.target).add(offset); controls.update();
+    },
+    zoom: (factor: number) => {
+      if (currentView !== "room") return;
+      const offset = camera.position.clone().sub(controls.target); offset.multiplyScalar(factor).clampLength(controls.minDistance, controls.maxDistance); camera.position.copy(controls.target).add(offset); controls.update();
+    },
     spin: () => { spinning = !spinning; if (reducedMotion) globe.rotation.y += Math.PI / 3; return spinning; },
     lighting: (mode: Lighting) => {
-      if (mode === "day") { hemi.intensity = 2.7; sun.intensity = 4.2; sun.color.set(0xffe5bb); sun.position.set(-7, 9, 5); fill.intensity = 1.1; lamp.intensity = 0; renderer.toneMappingExposure = 1.28; }
-      if (mode === "golden") { hemi.intensity = 1.8; sun.intensity = 5; sun.color.set(0xffb85c); sun.position.set(-8, 4.5, 3); fill.intensity = 0.7; lamp.intensity = 0; renderer.toneMappingExposure = 1.18; }
-      if (mode === "night") { hemi.intensity = 0.7; sun.intensity = 0.9; sun.color.set(0x9baeff); sun.position.set(-7, 9, 5); fill.intensity = 0.4; lamp.intensity = 55; renderer.toneMappingExposure = 1.15; }
+      renderer.shadowMap.needsUpdate = true;
+      lightMode = mode; background(); fixture.emissiveIntensity = mode === "night" ? 2.5 : 0.8;
+      if (mode === "day") { hemi.intensity = 2.7; sun.intensity = 4.2; sun.color.set(0xffe5bb); sun.position.set(-7, 9, 5); fill.intensity = 1.1; lamp.intensity = 5; renderer.toneMappingExposure = 1.28; }
+      if (mode === "golden") { hemi.intensity = 1.8; sun.intensity = 5; sun.color.set(0xffb85c); sun.position.set(-8, 4.5, 3); fill.intensity = 0.7; lamp.intensity = 8; renderer.toneMappingExposure = 1.18; }
+      if (mode === "night") { hemi.intensity = 0.7; sun.intensity = 0.9; sun.color.set(0x9baeff); sun.position.set(-7, 9, 5); fill.intensity = 0.4; lamp.intensity = 70; renderer.toneMappingExposure = 1.15; }
     },
     dispose: () => {
-      renderer.setAnimationLoop(null); observer.disconnect(); controls.dispose(); document.removeEventListener("visibilitychange", visibility);
-      renderer.domElement.removeEventListener("pointerdown", pointerDown); renderer.domElement.removeEventListener("pointerup", pointerUp); renderer.domElement.removeEventListener("pointercancel", pointerCancel);
+      renderer.setAnimationLoop(null); observer.disconnect(); controls.dispose(); walker.dispose(); document.removeEventListener("visibilitychange", visibility);
+      renderer.domElement.removeEventListener("pointerdown", pointerDown); renderer.domElement.removeEventListener("pointerup", pointerUp); renderer.domElement.removeEventListener("pointercancel", pointerCancel); renderer.domElement.removeEventListener("webglcontextlost", contextLost);
       scene.traverse(o => { if (o instanceof THREE.Mesh || o instanceof THREE.Points) o.geometry.dispose(); });
       textures.forEach(t => t.dispose()); materials.forEach(m => m.dispose()); renderer.dispose(); renderer.domElement.remove();
     },

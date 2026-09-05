@@ -16,4 +16,4 @@ People exploring a classroom from their mobile device; desktop controls also wor
 
 ## Capabilities and Constraints
 
-The user authorized Three.js or another suitable tool. Preserve the existing portfolio. Publish and verify the configured GitHub Pages deployment. Inferred scope for this session: a warm miniature classroom, touch orbit and zoom, camera presets, lighting choices, and explorable objects. No accounts or backend are needed.
+The user authorized Three.js or another suitable tool, then explicitly selected an immersive first-person classroom and delegated remaining creative and engineering decisions. First-person walking is the default: mobile thumb joystick plus simultaneous drag-to-look, desktop WASD and arrow keys, collision with walls and furniture, and a complete interior. Preserve the warm classroom, object discoveries, lighting, and optional architectural overview. Preserve the existing portfolio. Publish and verify the configured GitHub Pages deployment. No accounts or backend are needed.
