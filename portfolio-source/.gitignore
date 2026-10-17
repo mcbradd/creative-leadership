@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+references/
+preview/
+public/media/
+public/fonts/
+public/release.json
+release-host/
+upload-manifest.json
+release-payload/
+.env*
+*.log
+assets/generated/*.png
+assets/evidence/*-original.*

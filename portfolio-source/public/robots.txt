@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mcbradd.github.io/creative-leadership/portfolio/sitemap-index.xml

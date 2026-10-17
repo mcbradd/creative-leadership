@@ -1,0 +1,14 @@
+---
+import { url } from '../utils/urls';
+import type { projects } from '../data/projects';
+interface Props {project:typeof projects[number]; index?:number;}
+const {project:p,index=0}=Astro.props;
+---
+<article class="project-card" data-category={p.tags.join('|')} data-reveal>
+ <a class:list={['project-image',p.slug]} href={url(`/projects/${p.slug}/`)} aria-label={`Explore ${p.title}`}>
+ {p.image?<img src={url(`/media/evidence/${p.image}`)} alt={p.alt} loading="lazy" width="1280" height="720"/>:<div class="seed-art" aria-hidden="true"><span>same seed.</span><span>same rules.</span><span class="serif">credible evidence.</span><div class="seed-lines"><i></i><i></i><i></i></div></div>}
+ <span class="image-arrow" aria-hidden="true">↗</span>
+ </a>
+ <div class="project-meta"><span>0{index+1} / {p.tags[0]}</span><span>{p.status}</span></div>
+ <h3><a href={url(`/projects/${p.slug}/`)}>{p.title}</a></h3><p>{p.description}</p>
+</article>

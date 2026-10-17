@@ -531,6 +531,8 @@ describe("mobile-first presentation interactions", () => {
 
       await page.goBack({ waitUntil: "commit" }).catch(() => null);
       await page.locator(".detail-surface").waitFor({ state: "detached" });
+      // The popstate handler restores focus on the following animation frame.
+      await page.waitForFunction(() => document.querySelector("#proof .proof-case-link") === document.activeElement, null, { timeout: 5000 });
       assert.equal(await opener.evaluate((node) => node === document.activeElement), true);
     } finally {
       await context.close();

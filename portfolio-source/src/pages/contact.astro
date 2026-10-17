@@ -1,0 +1,7 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Contact Bradd McBrearty" description="Talk with Bradd McBrearty about AI design evaluation, art direction, technical art, and games. Based in Oceanside, California.">
+<div class="wrap contact-layout"><div><p class="eyebrow">Open to the right conversation</p><h1>Let’s<br/><em>talk.</em></h1><p class="lead">About design judgment. About making AI output better. About the next thing that deserves a thoughtful, exacting eye.</p><p class="lead">Based in Oceanside, California. Available remotely, or hybrid and on site within 50 miles.</p></div><div class="contact-links"><p class="eyebrow">Find me here</p><a href="mailto:bradd.mcbrearty@gmail.com">bradd.mcbrearty@gmail.com <span aria-hidden="true">↗</span></a><a href="https://www.linkedin.com/in/braddmcbrearty/">LinkedIn <span aria-hidden="true">↗</span></a><a href="https://bradd.artstation.com">ArtStation <span aria-hidden="true">↗</span></a><a href="https://github.com/mcbradd">GitHub <span aria-hidden="true">↗</span></a><button class="contact-copy">Copy email address</button><p class="contact-status" role="status" aria-live="polite"></p></div></div>
+<script>document.querySelector('.contact-copy')?.addEventListener('click',async()=>{const status=document.querySelector('.contact-status');try{await navigator.clipboard.writeText('bradd.mcbrearty@gmail.com');if(status)status.textContent='Email address copied.';}catch{if(status)status.textContent='Select and copy the email address above.';}});</script>
+</Base>

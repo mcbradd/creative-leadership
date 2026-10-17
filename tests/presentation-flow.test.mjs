@@ -107,12 +107,15 @@ describe("presentation flow", () => {
       const next = cue.getByRole("button", { name: "Next slide: Leadership lenses" });
       await next.click();
       await page.waitForFunction(() => document.querySelector(".presentation-cue")?.textContent?.includes("Leadership lenses"));
+      // A changed cue label is not a guarantee that the smooth scroll has settled.
+      await page.waitForFunction(() => Math.abs(document.querySelector("#capabilities")?.getBoundingClientRect().top ?? Infinity) <= 2, null, { timeout: 5000 });
       assert.ok(Math.abs(await page.locator("#capabilities").evaluate((node) => node.getBoundingClientRect().top)) <= 2);
       assert.notEqual(await page.evaluate(() => document.activeElement?.id), "capabilities", "pointer navigation must not create an automatic blue focus ring on the slide");
 
       const previous = cue.getByRole("button", { name: "Previous slide: Superpowers combined" });
       await previous.click();
       await page.waitForFunction(() => document.querySelector(".presentation-cue")?.textContent?.includes("Superpowers combined"));
+      await page.waitForFunction(() => Math.abs(document.querySelector("#top")?.getBoundingClientRect().top ?? Infinity) <= 2, null, { timeout: 5000 });
       assert.ok(Math.abs(await page.locator("#top").evaluate((node) => node.getBoundingClientRect().top)) <= 2);
     } finally {
       await context.close();

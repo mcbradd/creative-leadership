@@ -1,0 +1,96 @@
+export const projects = [
+  {
+    slug:'overlords-and-outlaws', title:'Overlords & Outlaws', eyebrow:'01 / Art direction · Game design',
+    summary:'A world of possibilities. A very specific quality bar.',
+    description:'84 researched, art-directed AI portraits inside a playable dynasty card game. Every portrait has a brief. Every decision has a reason.',
+    tags:['Art direction','Generative art','Game design'], image:'overlords-live-home.jpg', alt:'The live Overlords and Outlaws prototype with three illustrated historical cards on a candlelit table.',
+    live:'https://mcbradd.github.io/overlords-and-outlaws/', repo:'https://github.com/mcbradd/overlords-and-outlaws', status:'Playable prototype', date:'2026',
+    role:'Game design, art direction, and AI-directed development', credit:'Original concept: Malachy Murray. Game design, art direction, and AI-directed development: Bradd McBrearty. Portraits and environmental art are AI-generated.',
+    decision:'Protect the feeling of a physical game.',
+    decisionBody:'A flat card-lane redesign made the table tidier, but weakened the thing that made it a physical card game. I rejected that direction and brought back the 3D board, printed card faces, cardstock thickness, and contact shadows.',
+    sections:[
+      {title:'The brief',body:'Create a digital playtesting space for a physical dynasty game. Players build a family through blood and marriage, pay for coronation, and survive the rival Houses’ challenges. The interface needs to teach the game while preserving the pleasure of cards on a table.'},
+      {title:'Specificity is art direction',body:'Each of the 84 historical Royals starts with a researched brief: century, court, clothing, setting, props, sources, and what to avoid. Composition is designed for the frame opening of a 63:88 card. A portrait has to remain distinct and readable at the size where it will actually be used.'},
+      {title:'The review happens in context',body:'I reviewed Houses in contact sheets and in the rendered game, then directed revisions when faces read too alike. A source audit also flagged speculative armor and an out-of-period building. The record distinguishes historical reconstruction from portrait-informed interpretation.'},
+      {title:'Changing the game itself',body:'I judged the first conflict-focused prototype too close to existing combat card games. I kept its distinctive idea—winning through secure succession—and rebuilt the mechanics around it and resource circulation. That pivot is my design decision; AI coding agents implemented and tested against it.'},
+    ],
+    evidence:[
+      {label:'Read the portrait briefs',url:'https://github.com/mcbradd/overlords-and-outlaws/blob/main/docs/art/character-briefs.json'},
+      {label:'Inspect the generation manifest',url:'https://github.com/mcbradd/overlords-and-outlaws/blob/main/docs/art/character-generation.json'},
+      {label:'Read the portrait evidence audit',url:'https://github.com/mcbradd/overlords-and-outlaws/blob/main/docs/research/CHARACTER-PORTRAIT-EVIDENCE-AUDIT.md'},
+      {label:'Read the decision audit',url:'https://github.com/mcbradd/overlords-and-outlaws/blob/main/docs/DECISION-AUDIT-V3.md'},
+      {label:'See every printed card face',url:'https://mcbradd.github.io/overlords-and-outlaws/proof/'}
+    ],
+    limits:'This is a tested prototype. Human comprehension and competitive balance are not yet verified by outside playtests. Automated tradeoff candidates are not proof of human interest or fun.',
+    stack:'TypeScript · Three.js · Vite · Playwright · Claude and Codex under my direction',
+  },
+  {
+    slug:'ai-art-direction-review', title:'The art-direction review loop',eyebrow:'02 / Design critique · Rubrics',
+    summary:'“This feels off” is not a useful critique.',
+    description:'A repeatable review standard that turns a rendered screenshot into a specific, ranked, actionable critique. The tool recommends. I decide.',
+    tags:['Design critique','Art direction','Accessibility'],image:'creative-leadership-live-hero.jpg',alt:'The Bradd and Stone creative leadership website, showing its interactive black hole hero and oversized typography.',
+    live:'https://mcbradd.github.io/creative-leadership/',repo:'https://github.com/mcbradd/creative-leadership',status:'Live site and review tool',date:'2026',
+    role:'Content, art direction, rubric design, and site build',credit:'Made with collaborator Stone Perales. Content, art direction, and build: Bradd McBrearty. The site presents both creative leaders.',
+    decision:'Make every critique usable by the next person.',
+    decisionBody:'The standard I wrote requires a verdict, the exact screenshot, what the problem costs, and a concrete fix. Ranked improvements follow, along with a keep-list that protects what is already working.',
+    sections:[
+      {title:'The brief',body:'Build a creative-leadership presentation for Stone Perales and me, then make visual quality review repeatable. Source code alone cannot tell you whether a page communicates. The review must see the rendered page.'},
+      {title:'A rubric with consequences',body:'The review script samples up to 12 screenshots and sends them with the page’s copy to Claude. My rubric asks for specifics about hierarchy, typography, contrast, spacing, and rhythm. It explicitly rules out praise padding. Each critique is timestamped so design passes can be compared.'},
+      {title:'Human judgment stays in the loop',body:'The tool writes recommendations; it does not change the design. I choose which findings matter, which fixes to make, and what deserves to stay. Screenshot comparisons and accessibility checks give that judgment additional evidence.'},
+      {title:'From presentation to place',body:'The same repository hosts Room to Wonder, a first-person classroom prototype with desktop and touch controls, collision, discovery panels, and three lighting moods. It is a second context for testing how a visual idea holds up in use.'}
+    ],
+    evidence:[{label:'Read the exact review rubric',url:'https://github.com/mcbradd/creative-leadership/blob/main/scripts/design-review.mjs'},{label:'Walk through Room to Wonder',url:'https://mcbradd.github.io/creative-leadership/classroom/'}],
+    limits:'The review output is AI-generated advice, not an independent human assessment. Room to Wonder is a concept prototype. The live capture shows the current site, not an undocumented before-and-after.',
+    stack:'TypeScript · React · Three.js · Claude · Playwright · axe-core · pixelmatch',
+  },
+  {
+    slug:'colorbreak',title:'ColorBreak',eyebrow:'03 / UI & UX · Applied AI',summary:'Confidence belongs in the interface.',
+    description:'A phone-first bid planner that makes missing data and uncertain text visible—at the exact moment a person needs to make a decision.',
+    tags:['UI & UX','AI evaluation','Accessibility'],image:'colorbreak-live-entry.jpg',alt:'ColorBreak’s live entry screen with distinct buyer and seller paths.',
+    live:'https://mcbradd.github.io/ColorBreak/',repo:'https://github.com/mcbradd/ColorBreak',status:'Live public tool',date:'2026',
+    role:'Product concept, UX direction, AI evaluation, and release direction',credit:'Product concept and direction: Bradd McBrearty. Built with AI coding agents. Card and product data from MTGJSON and Scryfall.',
+    decision:'Never let a polished number conceal an unknown.',
+    decisionBody:'A buyer needs a fast decision. Speed cannot come at the cost of false certainty. Missing prices stay missing; uncertain OCR lines stay visible; every result names the assumptions behind it.',
+    sections:[
+      {title:'Two jobs, two clear paths',body:'A buyer wants to judge a color-slot bid in about ten seconds. A seller wants to plan the contents, costs, and asks for a break. I originated the product around those distinct jobs and directed it through the live release.'},
+      {title:'Read the screenshot, keep the doubt',body:'Screenshot recognition runs in the browser, on the device. Lines with mean OCR confidence below 80 remain visible and are identified by line number. The person can correct them before the text passes through the same parser used for typed input.'},
+      {title:'Ask the reviewers to break it',body:'Before the second version was built, I organized three rounds of review by defined AI expert personas: buyers, players, collectors, sellers, auctioneers, game theorists, and economists. They were briefed to falsify the specification. I adjudicated their findings against a written standard.'},
+      {title:'Accessibility is a product constraint',body:'Keyboard operation, visible focus, reduced motion, a usable 320-pixel layout, and meanings that do not rely on color alone are part of the contributor rules. Uncertainty is communicated in words, beside the result it affects.'}
+    ],
+    evidence:[{label:'Read the V2 review and adjudication',url:'https://github.com/mcbradd/ColorBreak/tree/main/docs/v2'},{label:'Inspect the public code',url:'https://github.com/mcbradd/ColorBreak'}],
+    limits:'The expert panel consisted of AI personas, not recruited human participants. Bid ceilings are modeled estimates, not guaranteed returns. No adoption or revenue result is claimed.',
+    stack:'TypeScript · React · On-device Tesseract OCR · Web Workers · Playwright',
+  },
+  {
+    slug:'whatnot-month-one',title:'Month One',eyebrow:'04 / Interface design · Decision systems',summary:'A plan that earns its next step.',
+    description:'An operating copilot for a new MTG store, where recorded evidence determines what work is ready to happen next.',
+    tags:['UI & UX','AI evaluation'],image:'month-one-live.jpg',alt:'Month One’s daily operating gate and planned work.',
+    live:'https://mcbradd.github.io/Whatnot/',repo:'https://github.com/mcbradd/Whatnot',status:'Live browser demo',date:'2026',
+    role:'Product creation, show-tool design, and AI-directed build',credit:'Created by Bradd McBrearty using AI tools. An independent project; not an official Whatnot product.',
+    decision:'Make “insufficient evidence” a useful answer.',decisionBody:'The next step does not unlock because the calendar moved. The application checks recorded answers and evidence, then allows the plan, preparation only, or a correction path.',
+    sections:[{title:'The brief',body:'Turn a 30-day launch plan for a Magic: The Gathering store into a usable operating system. The public demo keeps records on the device and walks through inventory qualification, rehearsals, six planned shows, and a final decision.'},{title:'Evidence before action',body:'Inventory requires exact identity, condition, dated market observations, and comparable completed sales. Forecasts wait for a comparable organic show. The pricing experiment withholds a winner when the sample or operational evidence is insufficient.'},{title:'Tools for the show',body:'Alongside Month One, I used AI to develop upgrade packages and a show control panel with timers, questions, and on-screen card controls. Those companion tools are part of my account of the project; they are not included in the public Month One build.'}],
+    evidence:[{label:'Inspect the published application',url:'https://github.com/mcbradd/Whatnot'}],limits:'The public repository contains a compiled application, not the application source. Show-control features described here are not demonstrated in that public build. No commercial performance is claimed.',stack:'React · Browser local storage · GitHub Pages',
+  },
+  {
+    slug:'phase-rs-ai-measurement',title:'Phase-RS contributions',eyebrow:'05 / Evaluation · Engineering collaboration',summary:'Before you compare, make it repeatable.',
+    description:'Public, maintainer-reviewed contributions that make game AI measurement more reproducible and its evidence easier to inspect.',
+    tags:['AI evaluation','Game design'],image:'',alt:'',
+    live:'https://github.com/phase-rs/phase/pulls?q=is%3Apr+author%3Amcbradd',repo:'https://github.com/mcbradd/phase',status:'Merged open-source contributions',date:'2026',
+    role:'Problem identification, experiment design, and AI-directed contributions',credit:'Phase-RS is maintained by Matt Evans and its community. Contributions directed by Bradd McBrearty and implemented with Claude Code; authorship is disclosed in the pull requests.',
+    decision:'Make the measurement trustworthy before tuning the result.',decisionBody:'A seeded game can only support a useful comparison if the seed and configuration actually determine its decisions. I identified measurement problems while building PodLAB and directed fixes with reviewable evidence.',
+    sections:[{title:'Find the uncontrolled variable',body:'PR #6197 documents an 18% divergence finding in repeated four-player games. Hash-map iteration order was leaking into AI choices. The change introduced stable ordering at nine sites and pinned tie-breaking behavior with tests.'},{title:'Keep the experiment’s boundaries',body:'PR #6777 reports a separate 100-pair experiment: 98 matching outcomes, two completion shifts from timeout to win, and zero divergent results. Both experiment arms already included measurement mode. This is evidence about that candidate-versus-control comparison, not a direct 18%-to-zero before-and-after.'},{title:'Make the engine the authority',body:'PR #8716 provides a thin deck-compatibility adapter so an external tool can ask the engine whether a deck is legal and supported. It avoids maintaining a second copy of the engine’s rules.'},{title:'Pass someone else’s review',body:'I directed Claude Code through implementation and testing, designed paired-seed evidence, and wrote or approved responses to maintainer feedback. I contributed to the engine; I did not build or own Phase-RS.'}],
+    evidence:[{label:'PR #6197 · Stable AI ordering',url:'https://github.com/phase-rs/phase/pull/6197'},{label:'PR #6777 · Measurement and paired evidence',url:'https://github.com/phase-rs/phase/pull/6777'},{label:'PR #8716 · Deck compatibility',url:'https://github.com/phase-rs/phase/pull/8716'}],
+    limits:'These results describe specific recorded runs, not a proof that every possible game is deterministic. The 0.9328 elapsed ratio in #6777 applies only to its paired comparison, not overall engine performance.',stack:'Rust · WebAssembly · Paired-seed evaluation · GitHub review · Claude Code',
+  }
+];
+
+export const work = [
+ {id:'falling-fantasy',title:'Falling Fantasy',project:'Tetris Beat',kind:'Technical art',role:'Shader, materials, rigging & VFX',copy:'A straight cylinder becomes a twisting, collapsing tunnel through one music-reactive unlit shader. One piece of geometry, instanced 500 times.',credit:'Visual work: Bradd McBrearty. Song: D. Tiffany.',url:'https://www.artstation.com/artwork/qe5BrP',video:'https://www.youtube.com/watch?v=NcQ6jX5dYJc'},
+ {id:'ultimate-rivals-rink',title:'The Rink',project:'Ultimate Rivals',kind:'Direction',role:'Technical Art Director → Chief Product Officer',copy:'A production pipeline from concept to playable assets, with responsibility for final rigging, animation, lighting, VFX, and interface quality.',credit:'Art direction: Branislav Perkovic. Concept art: crazybrush. Production with a team of specialists.',url:'https://www.artstation.com/artwork/kNERqn',video:'https://www.youtube.com/watch?v=vEwbCID6y-o'},
+ {id:'rapunzel-pan-flourish',title:'Rapunzel / Pan Flourish',project:'Disney Enchanted Tales',kind:'Characters',role:'Model, rig & final animation',copy:'Character performance built for the fixed camera and expressive, stylized world of Disney Enchanted Tales.',credit:'Final animation, character model, and rig: Bradd McBrearty. Textures: another artist.',url:'https://www.artstation.com/artwork/xXGlW',video:''},
+ {id:'magic-book-shop',title:'The Magic Book Shop',project:'Disney’s Ghosts of Mistwood',kind:'Environments',role:'Concept through in-game implementation',copy:'One of more than 100 buildings, with concept, modeling, shading, rendering, and implementation completed on a demanding release schedule.',credit:'This building: Bradd McBrearty. Disney’s Ghosts of Mistwood is a collaborative studio production.',url:'https://www.artstation.com/artwork/ynwe5',video:''},
+ {id:'secret-neighbor',title:'A world built for hiding',project:'Secret Neighbor / Roblox',kind:'Technical art',role:'Technical Art Director',copy:'Streaming priorities, selective lighting, and material templates designed to preserve the game’s visual identity on Roblox.',credit:'Technical art direction: Bradd McBrearty. Systems built with the engineering team.',url:'https://www.artstation.com/artwork/dKoqkQ',video:''},
+ {id:'saw-x',title:'Survive the Obby',project:'Saw X / Roblox',kind:'Technical art',role:'Technical Art Director',copy:'Artist-friendly lighting, camera, VFX, and UI sequencing tools—and a dialogue system that makes player choices drive scene events.',credit:'Technical art direction and tools: Bradd McBrearty, working with the lead engineer.',url:'https://www.artstation.com/artwork/dKoq3J',video:'https://www.youtube.com/watch?v=w6XlchBi5cs'},
+ {id:'summersalts',title:'Summersalts',project:'Tetris Beat',kind:'Technical art',role:'Shaders, materials, rigging & VFX',copy:'A concert-like interactive visualization drawn from the recording artist’s symbols and colors, and an early proving ground for the production tools.',credit:'Song, symbols, and colors: Alison Wonderland. Visual implementation: Bradd McBrearty.',url:'https://www.artstation.com/artwork/NyLJAN',video:'https://www.youtube.com/watch?v=Ko2WZcc4rE0'},
+ {id:'accidental-love',title:'Accidental Love',project:'Tetris Beat',kind:'Technical art',role:'Visual implementation & optimization',copy:'Audio-reactive materials and camera control, built around the artist’s palette and optimized across phones and 4K displays.',credit:'Song and palette: BAIYU. Shaders, materials, rigging, camera control, and implementation: Bradd McBrearty.',url:'https://www.artstation.com/artwork/JvqJLd',video:'https://www.youtube.com/watch?v=HuI4GxGx0ks'},
+];

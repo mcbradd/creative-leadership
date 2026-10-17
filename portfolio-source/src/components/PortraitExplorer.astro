@@ -1,0 +1,20 @@
+---
+import { url } from '../utils/urls';
+import portraits from '../data/portraits.json';
+const selection=portraits.slice(0,6);
+---
+<section class="portrait-explorer" aria-labelledby="portrait-heading">
+ <div class="section-heading"><div><p class="eyebrow">The art is only half the story</p><h2 id="portrait-heading">A face. A brief.<br/><em>A reason for every detail.</em></h2></div><p>Explore six of the 84 art-directed portraits. The exact prompts stay attached to the work.</p></div>
+ <div class="portrait-options" role="group" aria-label="Choose a portrait">{selection.map((p,i)=><button data-portrait={p.id} aria-pressed={i===0} aria-controls={`portrait-${p.id}`}><img src={url(p.thumb)} alt="" width="150" height="210" loading="lazy"/><span>{p.name}</span></button>)}</div>
+ <div class="portrait-panels">{selection.map((p,i)=><article id={`portrait-${p.id}`} class="portrait-panel" hidden={i!==0}>
+  <div class="portrait-frame"><img src={url(p.image)} alt={`AI-generated portrait of ${p.name}, art-directed for Overlords and Outlaws.`} loading="lazy" width="630" height="880"/></div>
+  <div class="portrait-copy"><p class="eyebrow">{p.house} / Overlords & Outlaws</p><h3>{p.name}</h3><p class="portrait-label">AI-generated · {p.uncertainty}</p><h4>The quality bar</h4><p>Historically specific attire and setting. A distinct face that reads at card size. Composition that fits the printed frame. A clear boundary between evidence and invention.</p><details><summary>Read the exact recorded prompt <span aria-hidden="true">+</span></summary><p class="prompt-text">{p.prompt}</p></details><a class="text-link" href={p.sourceRecordUrl}>Open the source record <span aria-hidden="true">↗</span></a></div>
+ </article>)}</div>
+</section>
+<script>
+document.querySelectorAll<HTMLButtonElement>('[data-portrait]').forEach(button=>button.addEventListener('click',()=>{
+ const root=button.closest('.portrait-explorer')!;
+ root.querySelectorAll('[data-portrait]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+ root.querySelectorAll<HTMLElement>('.portrait-panel').forEach(panel=>panel.hidden=panel.id!==`portrait-${button.dataset.portrait}`);
+}));
+</script>

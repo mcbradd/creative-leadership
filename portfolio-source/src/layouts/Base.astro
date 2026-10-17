@@ -1,0 +1,41 @@
+---
+import { url } from '../utils/urls';
+import '../styles/global.css';
+interface Props { title?: string; description?: string; dark?: boolean; image?: string; noindex?: boolean; }
+const {title='Bradd McBrearty — Art direction. Design judgment. Applied AI.', description='Creative and Technical Art Director. 15+ years of making, directing, and judging visual work for games. Explore the work, the decisions, and the evidence.',dark=false,image='/media/brand/social-cover.jpg',noindex=false}=Astro.props;
+const path=Astro.url.pathname;
+const localPath=path.replace(import.meta.env.BASE_URL.replace(/\/$/,''),'')||'/';
+const navigation=[['Selected projects','/projects/'],['The craft','/work/'],['My judgment','/judging-ai-output/'],['About','/about/']];
+---
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+ <script is:inline>document.documentElement.classList.add('js');</script>
+ <title>{title}</title><meta name="description" content={description}/><link rel="canonical" href={new URL(path,Astro.site)}/>
+ {noindex&&<meta name="robots" content="noindex"/>}
+ <meta name="theme-color" content="#151719"/><meta property="og:type" content="website"/><meta property="og:title" content={title}/><meta property="og:description" content={description}/><meta property="og:url" content={new URL(path,Astro.site)}/><meta property="og:image" content={new URL(url(image),Astro.site)}/><meta name="twitter:card" content="summary_large_image"/>
+ <link rel="icon" href={url('/media/brand/monogram.svg')} type="image/svg+xml"/><link rel="apple-touch-icon" href={url('/media/brand/apple-touch-icon.png')}/><link rel="stylesheet" href={url('/fonts/fonts.css')}/>
+ <script type="application/ld+json" set:html={JSON.stringify({'@context':'https://schema.org','@type':'Person',name:'Bradd McBrearty',url:'https://mcbradd.github.io/creative-leadership/portfolio/',jobTitle:'Creative and Technical Art Director',sameAs:['https://github.com/mcbradd','https://bradd.artstation.com','https://www.linkedin.com/in/braddmcbrearty/']})}/>
+</head>
+<body class:list={[dark&&'dark-page']}>
+ <a class="skip" href="#main">Skip to content</a>
+ <header class="site-header">
+  <a class="wordmark" href={url('/')} aria-label="Bradd McBrearty home"><span class="brand-dot"></span>Bradd McBrearty<span class="wordmark-role">Direction & design</span></a>
+  <button class="menu-toggle" aria-expanded="false" aria-controls="navigation">Menu <span aria-hidden="true">+</span></button>
+  <nav id="navigation" aria-label="Main navigation">{navigation.map(([label,href])=><a href={url(href)} aria-current={localPath.startsWith(href)?'page':undefined}>{label}</a>)}<a class="nav-contact" href={url('/contact/')}>Let’s talk <span aria-hidden="true">↗</span></a></nav>
+ </header>
+ <main id="main"><slot/></main>
+ <footer class="site-footer">
+  <div class="footer-top"><p class="eyebrow">A clear point of view. An open conversation.</p><a class="footer-cta" href="mailto:bradd.mcbrearty@gmail.com">Let’s make<br/><em>something good.</em><span aria-hidden="true">↗</span></a></div>
+  <div class="footer-bottom"><a href={url('/')}>Bradd McBrearty © {new Date().getFullYear()}</a><div><a href="https://github.com/mcbradd">GitHub ↗</a><a href="https://bradd.artstation.com">ArtStation ↗</a><a href="https://www.linkedin.com/in/braddmcbrearty/">LinkedIn ↗</a></div><a href="https://github.com/mcbradd/creative-leadership/tree/main/portfolio-source">Site source · GitHub Pages ↗</a></div>
+ </footer>
+ <script>
+ const toggle=document.querySelector<HTMLButtonElement>('.menu-toggle');
+ toggle?.addEventListener('click',()=>{const expanded=toggle.getAttribute('aria-expanded')==='true';toggle.setAttribute('aria-expanded',String(!expanded));document.getElementById('navigation')?.classList.toggle('is-open',!expanded);});
+ document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&toggle?.getAttribute('aria-expanded')==='true'){toggle.setAttribute('aria-expanded','false');document.getElementById('navigation')?.classList.remove('is-open');toggle.focus();}});
+ const media=matchMedia('(prefers-reduced-motion: reduce)');
+ if(!media.matches&&'IntersectionObserver'in window){const observer=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){entry.target.classList.add('revealed');observer.unobserve(entry.target);}}},{threshold:.08});document.querySelectorAll('[data-reveal]').forEach(el=>{el.classList.add('will-reveal');observer.observe(el);});}
+ </script>
+</body>
+</html>

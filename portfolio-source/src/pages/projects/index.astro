@@ -1,0 +1,9 @@
+---
+import Base from '../../layouts/Base.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import Filters from '../../components/Filters.astro';
+import {projects} from '../../data/projects';
+---
+<Base title="Selected AI projects — Bradd McBrearty" description="Five public projects showing art direction, precise critique, UI/UX, generative art, and AI evaluation—with the creative decisions and evidence beside the work.">
+ <div class="wrap"><header class="page-intro"><p class="eyebrow">Selected projects / 2026</p><h1>From possibility<br/>to <em>something considered.</em></h1><p class="lead">Five different briefs. The same standard: make the work clear, useful, and specific. Then show why it deserves to exist.</p></header><Filters options={['Art direction','Design critique','UI & UX','AI evaluation','Game design']} target=".project-card"/><div class="project-grid project-index">{projects.map((p,i)=><ProjectCard project={p} index={i}/>)}</div></div>
+</Base>

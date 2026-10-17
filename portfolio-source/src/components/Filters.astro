@@ -1,0 +1,18 @@
+---
+interface Props {options:string[];target:string;}
+const {options,target}=Astro.props;
+---
+<div class="filter-bar" data-filter-target={target} role="group" aria-label="Filter work"><button aria-pressed="true" data-filter="All">All work</button>{options.map(o=><button aria-pressed="false" data-filter={o}>{o}</button>)}</div>
+<p class="filter-status" role="status" aria-live="polite" data-filter-status></p>
+<script>
+document.querySelectorAll<HTMLElement>('[data-filter-target]').forEach(bar=>{
+ const items=Array.from(document.querySelectorAll<HTMLElement>(bar.dataset.filterTarget!));
+ const status=bar.nextElementSibling;
+ bar.querySelectorAll<HTMLButtonElement>('button').forEach(button=>button.addEventListener('click',()=>{
+   bar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+   let count=0;
+   items.forEach(item=>{const show=button.dataset.filter==='All'||item.dataset.category?.split('|').includes(button.dataset.filter!);item.hidden=!show;if(show){count++;item.classList.add('revealed');}});
+   if(status)status.textContent=`${count} ${count===1?'project':'projects'} shown`;
+ }));
+});
+</script>

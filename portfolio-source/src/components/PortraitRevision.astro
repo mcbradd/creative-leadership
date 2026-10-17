@@ -1,0 +1,15 @@
+---
+import { url } from '../utils/urls';
+interface Props {compact?:boolean;}
+const {compact=false}=Astro.props;
+---
+<div class:list={['revision',compact&&'revision-compact']}>
+ <div class="revision-heading"><span class="eyebrow">Henry VII / A documented revision</span><div class="revision-controls" aria-label="Choose comparison view"><button aria-pressed="true" data-view="detail">The detail</button><button aria-pressed="false" data-view="full">Full portrait</button></div></div>
+ <div class="revision-pair" data-comparison="detail"><figure><img src={url('/media/evidence/henry-vii-before-detail.webp')} alt="Before: an anachronistic nineteenth-century Westminster tower behind Henry VII." width="300" height="530" loading="lazy"/><figcaption><span>01 / Before</span>A convincing image.<br/>The wrong century.</figcaption></figure><figure><img src={url('/media/evidence/henry-vii-after-detail.webp')} alt="After: the tower is removed and the window shows low roofs, trees, and the Thames." width="300" height="530" loading="lazy"/><figcaption><span>02 / Revised</span>A quieter setting.<br/>A more credible portrait.</figcaption></figure></div>
+ <div class="revision-pair" data-comparison="full" hidden><figure><img src={url('/media/evidence/henry-vii-before.webp')} alt="The original AI-generated Henry VII portrait with the incorrect tower visible through the window." width="840" height="1167" loading="lazy"/><figcaption><span>01 / Before</span>Original generated portrait</figcaption></figure><figure><img src={url('/media/evidence/portrait-tudor-0.webp')} alt="The revised AI-generated Henry VII portrait, preserving the sitter and correcting the background." width="840" height="1167" loading="lazy"/><figcaption><span>02 / Revised</span>Installed corrected portrait</figcaption></figure></div>
+ <p class="revision-note">The direction: remove the nineteenth-century skyline; keep the face, costume, pose, and composition. Both images are original, recorded AI outputs. Detail views are matching crops.</p>
+ <a class="text-link" href="https://github.com/mcbradd/overlords-and-outlaws/blob/main/docs/art/character-generation.json">Read the recorded edit instruction ↗</a>
+</div>
+<script>
+ document.querySelectorAll<HTMLElement>('.revision').forEach(root=>root.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(button=>button.addEventListener('click',()=>{root.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));root.querySelectorAll<HTMLElement>('[data-comparison]').forEach(panel=>panel.hidden=panel.dataset.comparison!==button.dataset.view);})));
+</script>

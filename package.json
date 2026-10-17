@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.0"
   },
   "scripts": {
+    "prebuild": "npm run portfolio:build",
+    "portfolio:build": "node scripts/build-portfolio.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
