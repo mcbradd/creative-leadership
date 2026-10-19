@@ -86,6 +86,8 @@ The launch URL is `https://mcbradd.github.io/creative-leadership/portfolio/`, ba
 
 Navigation includes Projects, Work, Judgment, About, and Contact; the wordmark returns Home. Footer includes contact, external profiles, source repository, and GitHub Pages attribution. A skip link precedes navigation. On mobile, either a compact wrapping navigation or a true disclosure menu may be used; it must fit at 320px and remain usable by keyboard.
 
+The public contact address is **bradd.mcbrearty@gmail.com**. Use this exact address in visible copy, every `mailto:` link, and clipboard actions. Account identifiers and browser-profile addresses must never replace the public contact address.
+
 ### Common case-study structure
 
 1. Eyebrow with discipline and honest status; concise title; one-sentence outcome.

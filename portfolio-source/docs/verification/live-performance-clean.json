@@ -1,0 +1,167 @@
+{
+  "at": "2026-10-19T06:56:20.488Z",
+  "conditions": {
+    "surface": "In-app Chromium",
+    "viewport": "390x844",
+    "downloadMbps": 1.6,
+    "uploadMbps": 0.75,
+    "latencyMs": 150,
+    "cpuSlowdown": 4,
+    "cacheDisabled": true
+  },
+  "layoutShifts": [
+    {
+      "startTime": 2090,
+      "value": 0.042980608199637435
+    },
+    {
+      "startTime": 2403.800000011921,
+      "value": 0.00031562469628361613
+    }
+  ],
+  "lcp": [
+    {
+      "element": "H1",
+      "size": 51402,
+      "startTime": 748,
+      "url": ""
+    }
+  ],
+  "navigation": {
+    "activationStart": 0,
+    "confidence": {},
+    "connectEnd": 0.699999988079071,
+    "connectStart": 0.699999988079071,
+    "contentEncoding": "gzip",
+    "contentType": "text/html",
+    "criticalCHRestart": 0,
+    "decodedBodySize": 34491,
+    "deliveryType": "",
+    "domComplete": 2906.100000023842,
+    "domContentLoadedEventEnd": 725.3999999761581,
+    "domContentLoadedEventStart": 715.6999999880791,
+    "domInteractive": 297.69999998807907,
+    "domainLookupEnd": 0.699999988079071,
+    "domainLookupStart": 0.699999988079071,
+    "duration": 2906.199999988079,
+    "encodedBodySize": 8346,
+    "entryType": "navigation",
+    "fetchStart": 0.699999988079071,
+    "finalResponseHeadersStart": 16.399999976158142,
+    "firstInterimResponseStart": 0,
+    "initiatorType": "navigation",
+    "loadEventEnd": 2906.199999988079,
+    "loadEventStart": 2906.199999988079,
+    "name": "https://mcbradd.github.io/creative-leadership/portfolio/",
+    "navigationId": 8895,
+    "nextHopProtocol": "h2",
+    "notRestoredReasons": null,
+    "redirectCount": 0,
+    "redirectEnd": 0,
+    "redirectStart": 0,
+    "renderBlockingStatus": "non-blocking",
+    "requestStart": 2.899999976158142,
+    "responseEnd": 204.19999998807907,
+    "responseStart": 16.399999976158142,
+    "responseStatus": 200,
+    "secureConnectionStart": 0.699999988079071,
+    "serverTiming": [],
+    "startTime": 0,
+    "transferSize": 8646,
+    "type": "reload",
+    "unloadEventEnd": 209.19999998807907,
+    "unloadEventStart": 209.19999998807907,
+    "workerCacheLookupStart": 0,
+    "workerFinalSourceType": "",
+    "workerMatchedSourceType": "",
+    "workerRouterEvaluationStart": 0,
+    "workerStart": 0
+  },
+  "paint": [
+    {
+      "duration": 0,
+      "entryType": "paint",
+      "name": "first-paint",
+      "navigationId": 8895,
+      "paintTime": 706.3000000119209,
+      "presentationTime": 748,
+      "startTime": 748
+    },
+    {
+      "duration": 0,
+      "entryType": "paint",
+      "name": "first-contentful-paint",
+      "navigationId": 8895,
+      "paintTime": 706.3000000119209,
+      "presentationTime": 748,
+      "startTime": 748
+    }
+  ],
+  "resources": [
+    {
+      "duration": 179.89999997615814,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/fonts/fonts.css",
+      "transferSize": 500
+    },
+    {
+      "duration": 333.7999999523163,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/_astro/Base.wJj-1Ygm.css",
+      "transferSize": 7877
+    },
+    {
+      "duration": 1183.4000000357628,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/media/evidence/portrait-tudor-0-thumb.webp",
+      "transferSize": 34166
+    },
+    {
+      "duration": 1355,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/media/evidence/portrait-alba-0-thumb.webp",
+      "transferSize": 38460
+    },
+    {
+      "duration": 1681.800000011921,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/media/evidence/portrait-plantagenet-1-thumb.webp",
+      "transferSize": 46112
+    },
+    {
+      "duration": 1464.899999976158,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/fonts/manrope-600.woff2",
+      "transferSize": 30776
+    },
+    {
+      "duration": 1461.300000011921,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/fonts/manrope-regular.woff2",
+      "transferSize": 30676
+    },
+    {
+      "duration": 1295.9000000357628,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/fonts/instrument-serif-regular.woff2",
+      "transferSize": 25500
+    },
+    {
+      "duration": 1468,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/fonts/manrope-700.woff2",
+      "transferSize": 30968
+    },
+    {
+      "duration": 1357.100000023842,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/fonts/instrument-serif-italic.woff2",
+      "transferSize": 26676
+    },
+    {
+      "duration": 2186.300000011921,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/media/evidence/overlords-live-home.jpg",
+      "transferSize": 145409
+    },
+    {
+      "duration": 1824.5999999642372,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/media/evidence/creative-leadership-live-hero.jpg",
+      "transferSize": 76546
+    },
+    {
+      "duration": 180,
+      "name": "https://mcbradd.github.io/creative-leadership/portfolio/media/brand/monogram.svg",
+      "transferSize": 671
+    }
+  ]
+}

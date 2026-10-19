@@ -1,43 +1,63 @@
 # Release record
 
-Recorded October 17, 2026, approximately 00:30 Pacific time (America/Los_Angeles).
+Recorded October 19, 2026 UTC. Initial deployment completed October 18 at 23:51 Pacific time (America/Los_Angeles).
 
-**Status: implemented, revised, and verified locally; NOT PUBLISHED.** GitHub write access is blocked. Public deployment and external-browser verification of that deployment remain incomplete. A local preview is supporting evidence only.
+**Status: published and verified on GitHub Pages.**
 
-Target: https://mcbradd.github.io/creative-leadership/portfolio/
+- [Live portfolio](https://mcbradd.github.io/creative-leadership/portfolio/)
+- [Source repository](https://github.com/mcbradd/creative-leadership/tree/main/portfolio-source)
+- Implementation commit: `9466a0431a233ff473e250015fd833932bba131c`
+- [Successful build and Pages deployment](https://github.com/mcbradd/creative-leadership/actions/runs/39211238369), completed `2026-10-19T06:51:30Z`.
+- The public `portfolio/release.json` reported the exact implementation SHA during verification. Subsequent documentation commits do not change the reviewed site; the endpoint identifies the latest published artifact.
+- Pre-portfolio parent revision: `6313e7412ed4247c43f32aae46daf763e7d31810`.
 
-Source: https://github.com/mcbradd/creative-leadership/tree/main/portfolio-source
+## Required release gates
 
-The portfolio is an additive subtree. The existing leadership and classroom release gates remain required. The pre-portfolio parent revision is `6313e7412ed4247c43f32aae46daf763e7d31810`.
+The GitHub Actions run passed the unchanged parent release workflow: lint, portfolio type/build validation, parent TypeScript/Vite build, 28 core/interaction tests, 11 layout/presentation tests, 5 parent accessibility tests, and 3 classroom tests. Total: **47 tests passed, zero failures**. The portfolio type check reported zero errors, warnings, or hints. All 11 content routes, the explicit 404, sitemap, headings, metadata, and referenced local assets passed build validation.
 
-## Release gates
+Two pre-existing tests inspected an intermediate state. The detail test now waits for the opener to regain focus after the existing animation frame; the cue test waits for its destination to settle within the original two-pixel tolerance. These are bounded five-second condition waits, not arbitrary delays or removed assertions. The cue failure reproduced in a focused local run; focused checks, the full local suite, and the full CI suite passed after the change. Parent application code was unchanged.
 
-- The combined `npm run gates` finished successfully: lint, portfolio type/build validation, parent TypeScript/Vite build, 28 core/interaction tests, 11 layout/presentation tests, 5 accessibility tests, and 3 classroom tests. Total: 47 tests passed.
-- The final responsive-image adjustment was followed by another complete combined production build and portfolio type check: zero errors, warnings, or hints in the Astro check. All 11 content routes, the explicit 404, sitemap, headings, metadata, and referenced local assets passed validation.
-- Two pre-existing tests intermittently inspected an intermediate state. The detail test now waits for the opener to regain focus after the existing `requestAnimationFrame`; the cue test waits for its destination to settle within the same two-pixel tolerance before asserting. These are bounded five-second condition waits, not arbitrary delays or removed assertions. The cue failure reproduced in a focused run; focused checks and the full suite passed after the change. All temporary diagnostics were removed. Parent application code was unchanged.
+## Public deployment verification
 
-## Browser and design review
+- All **82 published output files** returned HTTP 200. This includes all content routes, explicit portfolio 404 page, scripts, styles, images, fonts, sitemap, social image, and release metadata. Every HTML page had one H1 and a canonical link, without unfinished placeholders. [HTTP report](verification/live-http.json).
+- External Chrome inspection at **1440×1000** and **390×844** confirmed the actual published composition and interactions: navigation, project and gallery filters, image dialog opening, Escape and focus restoration, both revision views, portrait selection, and exact-prompt disclosure.
+- The public contact text and all email links use **bradd.mcbrearty@gmail.com**. The live copy action invoked the browser clipboard with that exact value and completed successfully. Temporary observation instrumentation was removed and the page reloaded. No messages were sent.
+- All 12 page outputs were checked at **320×740** in external Chrome: no horizontal document overflow, no broken loaded images, and zero axe violations for WCAG 2 A/AA, 2.1 AA, and 2.2 AA tags. [Browser audit](verification/live-browser-audit.json). This is not complete WCAG certification.
+- Browser console inspection across the production template pass reported no warnings or errors.
+- The original leadership and classroom entry points remained HTTP 200 with their intended titles and rendered successfully in external Chrome. Their required automated release tests also passed.
+- An unknown portfolio route returns the existing generic GitHub Pages 404 (HTTP 404). The explicit portfolio `404.html` is available directly (HTTP 200, noindex). The origin-level `/robots.txt` is absent (HTTP 404); the portfolio's nested robots file does not control the origin. No parent hosting policy was replaced.
+- Temporary viewport, cache, network, CPU, and inspection overrides were reset after testing.
 
-- Rendered desktop, tablet, and phone design critique produced the revisions in DESIGN_REVIEW.md.
-- All 11 content routes were inspected at 320 px for horizontal document overflow and broken loaded images: none found. Composition was reviewed at 390, 768, 1440, and 1920 px as well.
-- Axe checks using WCAG 2 A/AA, 2.1 AA and 2.2 AA tags collectively covered all 12 page outputs. The homepage opacity-transition contrast finding was corrected. All rechecks reported zero violations. The production homepage was rechecked after its final image change in external Chrome and still reported zero violations. This does not constitute complete WCAG certification.
-- No-script mobile reading exposes navigation and all six portraits. Reduced-motion inspection reports no reveal initialization, `scroll-behavior: auto`, and zero portrait transition duration.
-- External Chrome, against the local production artifact: mobile navigation, gallery filter, image dialog, Escape and focus return, both revision modes, portrait selection, and email copy were exercised successfully. The copy action displayed “Email address copied.” No messages were sent. The browser console reported no warnings/errors during the production template pass.
-- Production source selection at 320 px chose the three 420 px portrait thumbnails, with all three images loaded and no horizontal overflow. Temporary browser viewport and script/media emulation overrides were reset.
-- Captures are preserved in the local working package at `preview/portfolio-desktop.jpg`, `preview/portfolio-mobile.jpg`, and `preview/home-desktop-full.jpg`. The latter predates the final responsive-image metadata change but depicts the same composition. These files show the localhost preview, not a public deployment.
+Actual production captures:
 
-## Delivery size and performance limits
+- [Desktop homepage](verification/live-desktop.jpg)
+- [Phone homepage](verification/live-mobile.jpg)
+- [Phone contact page](verification/live-contact-mobile.jpg)
 
-The prepared static portfolio contains approximately 5.2 MB across 82 files, including unused prepared image variants. Its homepage has approximately 8.2 KB of gzipped HTML, 7.4 KB of gzipped shared CSS, and 1.8 KB of inline script text (including structured metadata). The six WOFF2 font files total 173,108 bytes; source TTFs totaled roughly 507 KB. Images below the initial composition use native lazy loading.
+## Design review and static fallbacks
 
-One unthrottled, warm-cache localhost Chrome sample before the responsive-image adjustment reported 216 ms first contentful paint, a 216 ms largest-contentful-paint candidate, and approximately 795 ms load-event completion. These are local diagnostics, not mobile-network benchmarks, a Lighthouse score, final field Core Web Vitals, or a guarantee of GitHub Pages performance. Throttled production measurements remain part of the blocked public release verification.
+The critique and revisions are recorded in [DESIGN_REVIEW.md](DESIGN_REVIEW.md). Local composition review also covered 768 and 1920 px. The final design uses warm paper, editorial serif typography, charcoal sections, a portrait fan, a genuine recorded before/after correction, source-linked prompt exploration, and credited production work.
 
-The existing parent dependency tree reports three high-severity development-tool advisories (brace-expansion, js-yaml, source-map-js). They predate this addition; the parent application dependencies were not changed. The portfolio dependency audit reports zero vulnerabilities. The existing parent classroom bundle-size warning also remains. No unrelated dependency upgrade was used to broaden this portfolio task.
+The no-script local production check exposed navigation and all six portraits. Reduced-motion inspection reported no reveal initialization, automatic rather than smooth scrolling, and zero portrait transition duration. The homepage opacity transition was removed after a contrast finding; the corrected local and live accessibility checks passed. At 320 px the browser selected the 420 px portrait variants, without horizontal overflow.
 
-## Publication blocker
+## Production performance and limits
 
-The connected GitHub app rejected blob creation with HTTP 403, `Resource not accessible by integration`. The stored GitHub CLI credential is invalid; noninteractive SSH authentication failed; browser sign-in requires a passkey interaction. No branch update or Pages deployment occurred. The remote main revision was rechecked and remained `6313e7412ed4247c43f32aae46daf763e7d31810`.
+A documented mobile lab sample against the public homepage used in-app Chromium at **390×844**, cache disabled, **1.6 Mbps down / 0.75 Mbps up**, **150 ms latency**, and **4× CPU slowdown**. [Raw measurement](verification/live-performance-clean.json).
 
-The local checkout contains the complete additive source, release integration, and bounded test-wait corrections. DEPLOYMENT_HANDOFF.md describes how to resume after ordinary write authentication is restored. The existing Pages workflow remains intact and will build the portfolio through the parent `prebuild` hook.
+| Measurement | Observed result |
+| --- | --- |
+| First contentful paint | 748 ms |
+| Largest contentful paint candidate | 748 ms, headline |
+| Layout shift sum without recent input | 0.04330 |
+| Load event completion | 2,906 ms |
+| Transferred document and resources | 502,983 bytes |
 
-The task is incomplete until the reviewed commit is pushed, the Pages deployment succeeds, and the published URL is verified in an external browser.
+The measured load met the specified LCP, layout stability, and transfer budgets in this one lab run. It is not a Lighthouse score, field Core Web Vitals, or a guarantee for every device or connection. No field INP result is claimed. The separate external Chrome timing sample was excluded because its automation cursor image appeared among LCP candidates and distorted presentation timing. External Chrome remained the browser used for mandatory live visual and interaction verification.
+
+The static portfolio contains approximately 5.2 MB across 82 files, including unused prepared image variants. The homepage has approximately 8.2 KB of gzipped HTML, 7.4 KB of gzipped shared CSS, and 1.8 KB of inline script text including structured metadata. Six self-hosted WOFF2 fonts total 173,108 bytes. Below-fold imagery uses native lazy loading.
+
+## Maintenance notes
+
+GitHub CLI authentication was restored and publication succeeded. The original connection failures are resolved for this release. [Publication and maintenance](DEPLOYMENT_HANDOFF.md) describes subsequent releases.
+
+The existing parent dependency tree reports three high-severity development-tool advisories (brace-expansion, js-yaml, source-map-js). They predate this addition; the portfolio dependency audit reports zero vulnerabilities. The parent classroom bundle-size warning remains. GitHub also emitted action-runtime and runner-image migration notices; neither blocked this deployment. Unrelated dependency or workflow upgrades were not added to this portfolio release.

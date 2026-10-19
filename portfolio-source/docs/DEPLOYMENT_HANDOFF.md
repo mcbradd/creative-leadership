@@ -1,26 +1,22 @@
-# Publication handoff
+# Publication and maintenance
 
-The portfolio implementation is prepared for the existing `mcbradd/creative-leadership` GitHub Pages release path. Publication is currently blocked by authentication, not by a missing hosting configuration.
+The portfolio uses the existing `mcbradd/creative-leadership` GitHub Pages release path. GitHub CLI authentication was restored on October 18, 2026, and the prepared implementation commit was pushed successfully. See [RELEASE.md](RELEASE.md) for the verified deployment and browser evidence.
 
-## Observed access failures
+## Subsequent releases
 
-- The connected GitHub app can read the public repository, but `create_blob` returned HTTP 403: `Resource not accessible by integration`.
-- `gh auth status` reports the stored `mcbradd` token invalid.
-- Noninteractive SSH authentication returned `Permission denied (publickey)`.
-- The browser reached GitHub two-factor authentication and requested a passkey interaction. No security protection was bypassed.
+Use the repository checkout that contains `portfolio-source/`. Do not overwrite another checkout's uncommitted work.
 
-No remote branch was updated by these attempts. A local release commit and a binary-capable patch preserve the prepared change. The repository's existing deployment workflow is unchanged.
+1. Check `git status` and fetch `origin/main`. Incorporate upstream changes while preserving unrelated work; never force-push this release path.
+2. Use Node 22.22 or newer. Run `npm ci`, install Playwright Chromium if needed, and run `npm run gates` from the repository root. The portfolio dependency install, type check, production build, and asset validation run through `prebuild`.
+3. Push validated changes to `main`. Wait for the exact commit's **Deploy to GitHub Pages** workflow to succeed. The existing workflow runs all parent-site and classroom checks before publication.
+4. Confirm `https://mcbradd.github.io/creative-leadership/portfolio/release.json` reports the pushed SHA. Verify the public portfolio in external Chrome at desktop and phone sizes: navigation, project/gallery filters, image dialog and Escape/focus return, portrait selection, comparison modes, exact-prompt disclosure, and email copy.
+5. Check every content route, the explicit portfolio `404.html`, sitemap, social image, and original leadership/classroom URLs. Unknown URLs use the parent Pages 404 policy. A nested `robots.txt` does not override the origin-wide policy.
+6. Record actual results in RELEASE.md. A successful push or a localhost screenshot alone does not establish a verified release.
 
-## Resume after authentication is restored
+The only public contact address is **bradd.mcbrearty@gmail.com**, including visible text, email links, and copied values.
 
-Use the prepared `release-host` checkout, or apply the release patch to a clean checkout of `mcbradd/creative-leadership`. Do not overwrite another checkout's uncommitted work.
+## Local production preview
 
-1. Restore an ordinary write-enabled GitHub connection, or sign the GitHub CLI into the intended account. Do not paste credentials into the repository or into chat.
-2. Fetch `origin/main` and compare it to the recorded parent. If it advanced, incorporate the new commits while preserving the portfolio addition and any unrelated work. Never force-push this release.
-3. Run `npm ci`, install the repository's Playwright Chromium dependency if needed, and run `npm run gates` from the repository root. The portfolio build, type check, and asset validation now run through `prebuild`.
-4. Push the reviewed commit to `main` through the existing release path. Wait for the specific GitHub Actions Pages run to succeed.
-5. Confirm `https://mcbradd.github.io/creative-leadership/portfolio/release.json` reports that pushed SHA. Exercise the deployed portfolio in external Chrome at desktop and phone sizes: navigation, project/gallery filters, image dialog and Escape, portrait selection, comparison modes, exact-prompt disclosure, and email copy.
-6. Check every content route, the explicit portfolio `404.html`, sitemap, social image, and original leadership/classroom URLs. Record the effective unknown-route and origin robots behavior.
-7. Replace the blocked status in RELEASE.md with the actual SHA, workflow URL, timestamps, and live evidence. Only then treat the task as complete.
+From the repository root, run `npm run build` and `npm run preview -- --host 127.0.0.1 --port 4173`. Open `http://127.0.0.1:4173/creative-leadership/portfolio/`.
 
-The current local production preview is served at `http://127.0.0.1:4173/creative-leadership/portfolio/`. Restart it with `npm run preview -- --host 127.0.0.1 --port 4173` from the prepared repository checkout if necessary. A localhost preview is not a public deployment.
+The generated `public/portfolio/` output is ignored by Git. Commit the source, prepared assets, and lockfiles; do not publish local captures, source downloads, credentials, or caches.

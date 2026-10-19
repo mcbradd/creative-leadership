@@ -6,7 +6,7 @@ Prepared October 16, 2026; launch configuration revised October 17, 2026 (Americ
 
 Deliver the site defined in [SPEC.md](SPEC.md), its public source, supporting evidence, and a verified GitHub Pages deployment at `https://mcbradd.github.io/creative-leadership/portfolio/`. The source lives in `portfolio-source/` and the compiled site in `public/portfolio/` of [mcbradd/creative-leadership](https://github.com/mcbradd/creative-leadership). The user's authorization includes implementation, design critique, revisions, publication, and live verification. Continue through routine reversible implementation decisions without another approval gate.
 
-The existing repository has verified connected-app write access and an established Pages release path. This additive launch preserves the original leadership site and classroom. A standalone `mcbradd/mcbradd.github.io` repository remains an optional future migration; it is not required to satisfy the requested GitHub Pages portfolio.
+The existing repository has an established Pages release path. GitHub CLI write access was restored for publication on October 18, 2026. This additive launch preserves the original leadership site and classroom. A standalone `mcbradd/mcbradd.github.io` repository remains an optional future migration; it is not required to satisfy the requested GitHub Pages portfolio.
 
 Dependencies are deliberate: evidence precedes copy; page structure precedes decorative motion; rendered critique precedes polish; build/test success precedes publication; deployed verification precedes completion. Do not sacrifice evidence or mobile usability for visual novelty.
 
@@ -28,7 +28,7 @@ Dependencies are deliberate: evidence precedes copy; page structure precedes dec
 3. Initialize an Astro static site with TypeScript, reproducible package lockfile, and an explicit supported Node version. Read the installed package requirements before pinning the runtime.
 4. Configure `site: https://mcbradd.github.io` and `base: /creative-leadership/portfolio`. Use one base-aware helper for routes and assets. Generate static directory routes; ensure deep-link loads do not depend on client routing. Audit canonical, social, sitemap, and structured-data URLs for the deployed prefix.
 5. Build shared layout, navigation, footer, metadata, skip link, image helper, typographic components, evidence link treatment, and responsive tokens.
-6. Add minimal scripts for install/build/check/preview and meaningful browser checks. Preserve required checks in the parent repository's CI. The compiled `public/portfolio/` subtree is intentionally versioned for the parent's static-asset release path; keep temporary captures and local caches out of it.
+6. Add minimal scripts for install/build/check/preview and meaningful browser checks. Preserve required checks in the parent repository's CI. The compiled `public/portfolio/` subtree is generated during the parent build and ignored by Git; version the source, prepared assets, and lockfile. Keep temporary captures and local caches out of the published output.
 
 **Suggested source layout, placed under the parent repository's `portfolio-source/`:**
 
@@ -135,7 +135,7 @@ Run tests appropriate to these real failure modes. Do not create tests that mere
 
 ## Milestone 7 — GitHub Pages deployment
 
-1. Verify `mcbradd/creative-leadership`, its default branch, and the current parent commit before publication. Add `portfolio-source/` and compiled `public/portfolio/`; preserve the original leadership site, classroom, and existing release workflow. Keep other project-site URLs external and unchanged.
+1. Verify `mcbradd/creative-leadership`, its default branch, and the current parent commit before publication. Add `portfolio-source/` and the build integration that generates `public/portfolio/`; preserve the original leadership site, classroom, and existing release workflow. Keep other project-site URLs external and unchanged.
 2. Follow the parent's configured GitHub Actions Pages release path. Commit source and the lockfile; build the portfolio reproducibly and stage its compiled output into `public/portfolio/`. The parent build then carries that static directory to its published output. Verify this behavior rather than assuming it.
 3. Run all required parent and portfolio checks, build the combined static output, upload the Pages artifact, then deploy only after the required jobs succeed. Retain supported action versions unless a verified incompatibility requires an update. Do not bypass existing gates to obtain a green deployment.
 4. Restrict publishing to the intended default branch and optional manual dispatch. Pull-request checks may build but must not publish previews to production implicitly.

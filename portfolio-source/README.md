@@ -2,7 +2,7 @@
 
 [Open the portfolio](https://mcbradd.github.io/creative-leadership/portfolio/) · [Source repository](https://github.com/mcbradd/creative-leadership/tree/main/portfolio-source)
 
-**Release status:** implemented and reviewed locally; GitHub publication is blocked by account access. The links above are the configured publication destinations, not a claim of a completed deployment. See [RELEASE.md](docs/RELEASE.md).
+**Release status:** published on GitHub Pages and verified in external Chrome at desktop and phone sizes. The release passed all 47 repository tests, live route/asset checks, and the selected accessibility checks. See [RELEASE.md](docs/RELEASE.md) for the deployed commit, workflow, screenshots, measurements, and limitations.
 
 An editorial portfolio about making, judging, and refining visual work. Built for the AI Tutor – Design opportunity, with five evidence-led project studies, an eight-piece production gallery, a genuine historical-portrait revision, six explorable prompt records, and an essay on design judgment.
 

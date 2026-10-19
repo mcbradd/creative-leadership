@@ -1,0 +1,532 @@
+{
+  "verifiedAt": "2026-10-19T06:51:57.884Z",
+  "expected": "9466a0431a233ff473e250015fd833932bba131c",
+  "base": "https://mcbradd.github.io/creative-leadership/portfolio/",
+  "records": [
+    {
+      "route": "",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/",
+      "title": "Bradd McBrearty — Art direction. Design judgment. Applied AI.",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "_astro/Base.wJj-1Ygm.css",
+      "status": 200,
+      "type": "text/css; charset=utf-8"
+    },
+    {
+      "route": "404.html",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/404/",
+      "title": "Page not found — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "about/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/about/",
+      "title": "About Bradd McBrearty — Creative &amp; Technical Art Director",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "contact/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/contact/",
+      "title": "Contact Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com",
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "fonts/fonts.css",
+      "status": 200,
+      "type": "text/css; charset=utf-8"
+    },
+    {
+      "route": "fonts/instrument-serif-italic.woff2",
+      "status": 200,
+      "type": "font/woff2"
+    },
+    {
+      "route": "fonts/instrument-serif-regular.woff2",
+      "status": 200,
+      "type": "font/woff2"
+    },
+    {
+      "route": "fonts/InstrumentSerif-OFL.txt",
+      "status": 200,
+      "type": "text/plain; charset=utf-8"
+    },
+    {
+      "route": "fonts/manrope-500.woff2",
+      "status": 200,
+      "type": "font/woff2"
+    },
+    {
+      "route": "fonts/manrope-600.woff2",
+      "status": 200,
+      "type": "font/woff2"
+    },
+    {
+      "route": "fonts/manrope-700.woff2",
+      "status": 200,
+      "type": "font/woff2"
+    },
+    {
+      "route": "fonts/Manrope-OFL.txt",
+      "status": 200,
+      "type": "text/plain; charset=utf-8"
+    },
+    {
+      "route": "fonts/manrope-regular.woff2",
+      "status": 200,
+      "type": "font/woff2"
+    },
+    {
+      "route": "judging-ai-output/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/judging-ai-output/",
+      "title": "How I judge AI output — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "media/brand/apple-touch-icon.png",
+      "status": 200,
+      "type": "image/png"
+    },
+    {
+      "route": "media/brand/bradd-headshot-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/brand/bradd-headshot.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/brand/monogram.svg",
+      "status": 200,
+      "type": "image/svg+xml"
+    },
+    {
+      "route": "media/brand/social-cover.jpg",
+      "status": 200,
+      "type": "image/jpeg"
+    },
+    {
+      "route": "media/brand/social-cover.svg",
+      "status": 200,
+      "type": "image/svg+xml"
+    },
+    {
+      "route": "media/evidence/accidental-love-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/accidental-love.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/colorbreak-live-entry.jpg",
+      "status": 200,
+      "type": "image/jpeg"
+    },
+    {
+      "route": "media/evidence/creative-leadership-live-hero.jpg",
+      "status": 200,
+      "type": "image/jpeg"
+    },
+    {
+      "route": "media/evidence/falling-fantasy-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/falling-fantasy.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/henry-vii-after-detail.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/henry-vii-before-detail.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/henry-vii-before.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/magic-book-shop-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/magic-book-shop.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/month-one-live.jpg",
+      "status": 200,
+      "type": "image/jpeg"
+    },
+    {
+      "route": "media/evidence/overlords-live-home.jpg",
+      "status": 200,
+      "type": "image/jpeg"
+    },
+    {
+      "route": "media/evidence/portrait-alba-0-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-alba-0.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-alba-13-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-alba-13.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-bourbon-1-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-bourbon-1.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-bourbon-6-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-bourbon-6.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-contact-sheet.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-habsburg-0-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-habsburg-0.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-habsburg-8-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-habsburg-8.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-plantagenet-0-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-plantagenet-0.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-plantagenet-1-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-plantagenet-1.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-tudor-0-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-tudor-0.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-tudor-2-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-tudor-2.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-valois-1-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-valois-1.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-valois-2-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/portrait-valois-2.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/rapunzel-pan-flourish-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/rapunzel-pan-flourish.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/saw-x-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/saw-x.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/secret-neighbor-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/secret-neighbor.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/summersalts-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/summersalts.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/ultimate-rivals-rink-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/evidence/ultimate-rivals-rink.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/generated/judgment-paper-study-thumb.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "media/generated/judgment-paper-study.webp",
+      "status": 200,
+      "type": "image/webp"
+    },
+    {
+      "route": "projects/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/projects/",
+      "title": "Selected AI projects — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "projects/ai-art-direction-review/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/projects/ai-art-direction-review/",
+      "title": "The art-direction review loop — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "projects/colorbreak/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/projects/colorbreak/",
+      "title": "ColorBreak — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "projects/overlords-and-outlaws/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/projects/overlords-and-outlaws/",
+      "title": "Overlords &amp; Outlaws — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "projects/phase-rs-ai-measurement/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/projects/phase-rs-ai-measurement/",
+      "title": "Phase-RS contributions — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "projects/whatnot-month-one/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/projects/whatnot-month-one/",
+      "title": "Month One — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    },
+    {
+      "route": "release.json",
+      "status": 200,
+      "type": "application/json; charset=utf-8",
+      "release": {
+        "commit": "9466a0431a233ff473e250015fd833932bba131c",
+        "builtAt": "2026-10-19T06:41:04.913Z"
+      }
+    },
+    {
+      "route": "robots.txt",
+      "status": 200,
+      "type": "text/plain; charset=utf-8"
+    },
+    {
+      "route": "sitemap-0.xml",
+      "status": 200,
+      "type": "application/xml"
+    },
+    {
+      "route": "sitemap-index.xml",
+      "status": 200,
+      "type": "application/xml"
+    },
+    {
+      "route": "work/",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "h1Count": 1,
+      "canonical": "https://mcbradd.github.io/creative-leadership/portfolio/work/",
+      "title": "The craft behind the judgment — Bradd McBrearty",
+      "unfinished": false,
+      "emailLinks": [
+        "bradd.mcbrearty@gmail.com"
+      ]
+    }
+  ],
+  "extras": [
+    {
+      "url": "https://mcbradd.github.io/creative-leadership/",
+      "status": 200,
+      "title": "Bradd + Stone: Creative Leadership",
+      "bodyBytes": 2719
+    },
+    {
+      "url": "https://mcbradd.github.io/creative-leadership/classroom/",
+      "status": 200,
+      "title": "Room to Wonder — First-Person Classroom",
+      "bodyBytes": 922
+    },
+    {
+      "url": "https://mcbradd.github.io/creative-leadership/portfolio/release-verification-missing/",
+      "status": 404,
+      "title": "Page not found &middot; GitHub Pages",
+      "bodyBytes": 9379
+    },
+    {
+      "url": "https://mcbradd.github.io/robots.txt",
+      "status": 404,
+      "title": "Site not found &middot; GitHub Pages",
+      "bodyBytes": 9115
+    }
+  ]
+}
